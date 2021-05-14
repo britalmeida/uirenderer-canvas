@@ -5,7 +5,7 @@ function isPowerOf2(value) {
 
 // Initialize a texture and load an image.
 // When the image finished loading copy it into the texture.
-export function loadTexture(gl, url) {
+export function loadTexture(gl, url, cb) {
 
   const texture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -24,10 +24,10 @@ export function loadTexture(gl, url) {
   const srcType = gl.UNSIGNED_BYTE;
   const pixel = new Uint8Array([80, 0, 80, 255]);
   gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
-                width, height, border, srcFormat, srcType,
-                pixel);
+                width, height, border, srcFormat, srcType, pixel);
 
   const image = new Image();
+
   image.onload = function() {
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
@@ -46,7 +46,10 @@ export function loadTexture(gl, url) {
        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     }
+
+    cb();
   };
+
   image.src = url;
 
   return texture;
