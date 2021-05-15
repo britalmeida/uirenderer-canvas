@@ -1,5 +1,5 @@
 function isPowerOf2(value) {
-  return (value & (value - 1)) == 0;
+  return (value & (value - 1)) === 0;
 }
 
 
@@ -246,7 +246,7 @@ export function loadTexture(gl, url, cb) {
 // Get the shader location of an attribute of a shader by name.
 export function bind_attr(gl, program, attr_name) {
   const attr_idx = gl.getAttribLocation(program, attr_name);
-  if (attr_idx == -1)
+  if (attr_idx === -1)
     console.error("Can not bind attribute'", attr_name, "'for shader.");
   return attr_idx;
 }
@@ -280,7 +280,7 @@ function load_shader(gl, shader_type, source_code) {
 
   const shader = gl.createShader(shader_type);
 
-  console.log("Compiling", (shader_type==gl.VERTEX_SHADER)? "Vertex" : "Fragment", "Shader...");
+  console.log("Compiling", (shader_type===gl.VERTEX_SHADER)? "Vertex" : "Fragment", "Shader...");
 
   gl.shaderSource(shader, source_code);
   gl.compileShader(shader);
