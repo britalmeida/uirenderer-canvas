@@ -3,6 +3,37 @@ function isPowerOf2(value) {
 }
 
 
+// Representation of a rectangle for geometry operations.
+export function Rect (x, y, w, h) {
+
+  this.left   = x;
+  this.right  = x + w;
+  this.top    = y;
+  this.bottom = y + h;
+  this.width  = w;
+  this.height = h;
+
+  this.contains = function (x, y) {
+    return this.left <= x && x <= this.right &&
+        this.top  <= y && y <= this.bottom;
+  }
+
+  this.widen = function (val) {
+    this.left -= val;
+    this.top -= val;
+    this.width += val * 2.0;
+    this.height += val * 2.0;
+    this.right = this.left + this.width;
+    this.bottom = this.top + this.height;
+  }
+  this.widened = function (val) {
+    return new Rect(this.left - val, this.top - val,
+        this.width + val * 2.0, this.height + val * 2.0);
+  }
+
+}
+
+
 function DrawCommand(verts, color) {
   this.verts = verts;
   this.color = color;
