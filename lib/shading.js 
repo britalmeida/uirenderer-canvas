@@ -27,6 +27,7 @@ export function loadTexture(gl, url, cb) {
                 width, height, border, srcFormat, srcType, pixel);
 
   const image = new Image();
+  image.crossOrigin = "anonymous";
 
   image.onload = function() {
     gl.bindTexture(gl.TEXTURE_2D, texture);
