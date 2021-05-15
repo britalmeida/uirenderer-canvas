@@ -3,6 +3,192 @@ function isPowerOf2(value) {
 }
 
 
+function DrawCommand(verts, color) {
+  this.verts = verts;
+  this.color = color;
+}
+
+
+export function UIRenderer(canvas) {
+
+  // Rendering context
+  this.gl = null;
+
+  // Viewport transform
+  this.rect = [1, 1]; // Size of the view, in pixels.
+                      // Should match the canvas and render buffer size.
+  this.transform = [ 1, 0, 0, 0,
+                     0,-1, 0, 0,
+                     0, 0, 1, 0,
+                     0, 0, 0, 1];
+
+  // Shader data
+  this.shaderInfo = {};
+  this.buffers = {};
+  this.drawList = [];
+
+  // Set the background color for the canvas.
+  this.setClearColor = function (r, g, b, a) {
+    this.gl.clearColor(r, g, b, a);
+  }
+
+  // Add primitives.
+  this.addRect = function (left, top, width, height, color) {
+    const right = left + width;
+    const bottom = top + height;
+    this.drawList.push(new DrawCommand(new Float32Array([
+        right, top,
+        left,  top,
+        right, bottom,
+        left,  bottom
+      ]), color
+    ));
+  }
+
+  this.addLine = function (p1, p2, width, color) {
+    const hwidth = width / 2;
+    this.drawList.push(new DrawCommand(new Float32Array([
+        p1[0] + hwidth, p1[1] - hwidth,
+        p1[0] - hwidth, p1[1] - hwidth,
+        p2[0] + hwidth, p2[1] + hwidth,
+        p2[0] - hwidth, p2[1] + hwidth,
+      ]), color
+    ));
+  }
+
+  this.addTriangle = function (p1, p2, p3, color) {
+    this.drawList.push(new DrawCommand(new Float32Array([
+        p1[0], p1[1],
+        p2[0], p2[1],
+        p3[0], p3[1],
+        p3[0], p3[1],
+      ]), color
+    ));
+  }
+
+  // Draw a frame with the current primitive commands.
+  this.draw = function() {
+    const gl = this.gl;
+
+    // Set this view to occupy the full canvas.
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    this.rect = [gl.canvas.width, gl.canvas.height];
+
+    // Clear the color buffer with specified clear color.
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    // Bind the shader.
+    gl.useProgram(this.shaderInfo.program);
+
+    // Set the transform.
+    gl.uniformMatrix4fv(this.shaderInfo.uniforms.modelViewProj, false, this.transform);
+
+    // Draw commands.
+    for (const cmd of this.drawList) {
+
+      // Set the color
+      gl.uniform4fv(this.shaderInfo.uniforms.fillColor, cmd.color);
+
+      // Set the geometry
+      const dpi = window.devicePixelRatio;
+      const pixel = {
+        x: 2.0 * dpi / this.rect[0], // Shader clip space is [-1,1], therefore divide 2.
+        y: 2.0 * dpi / this.rect[1]
+      }
+      const positions = new Float32Array([
+        cmd.verts[0] * pixel.x -1, cmd.verts[1] * pixel.y -1,
+        cmd.verts[2] * pixel.x -1, cmd.verts[3] * pixel.y -1,
+        cmd.verts[4] * pixel.x -1, cmd.verts[5] * pixel.y -1,
+        cmd.verts[6] * pixel.x -1, cmd.verts[7] * pixel.y -1,
+      ]);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.pos);
+      gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW); // Transfer data to GPU
+      gl.enableVertexAttribArray(this.shaderInfo.attrs.vertexPos);
+      gl.vertexAttribPointer(
+        this.shaderInfo.attrs.vertexPos, // Shader attribute index
+        2,         // Number of elements per vertex
+        gl.FLOAT,  // Data type of each element
+        false,     // Normalized?
+        0,         // Stride if data is interleaved
+        0          // Pointer offset to start of data
+      );
+
+      // Draw
+      gl.drawArrays(gl.TRIANGLE_STRIP,
+        0, // Offset.
+        4  // Vertex count.
+      );
+    }
+
+    // Unbind the buffers and the shader.
+    gl.disableVertexAttribArray(this.shaderInfo.attrs.vertexPos);
+    gl.useProgram(null);
+
+    // Clear the draw list.
+    this.drawList = [];
+  }
+
+  // Initialize the renderer: compile the shader and setup static data.
+  this.init = function (canvas) {
+
+    // Initialize the GL context.
+    const gl = canvas.getContext('webgl');
+    if (!gl) {
+      // Only continue if WebGL is available and working.
+      alert('Unable to initialize WebGL. Your browser or machine may not support it.');
+      return;
+    }
+    this.gl = gl;
+
+    // Vertex shader.
+    const vs_source = `
+      attribute vec2 v_pos;
+      uniform mat4 mvp;
+
+      void main() {
+        gl_Position = mvp * vec4(v_pos, 0.0, 1.0);
+      }
+    `;
+
+    // Fragment shader.
+    const fs_source = `
+      uniform highp vec4 fill_color;
+
+      void main() {
+        gl_FragColor = fill_color;
+      }
+    `;
+
+    // Load and compile shaders.
+    const shaderProgram = init_shader_program(gl, vs_source, fs_source);
+
+    // Collect the shader's attribute locations.
+    this.shaderInfo = {
+      program: shaderProgram,
+      attrs: {
+        vertexPos: bind_attr(gl, shaderProgram, 'v_pos'),
+      },
+      uniforms: {
+        modelViewProj: gl.getUniformLocation(shaderProgram, 'mvp'),
+        fillColor: gl.getUniformLocation(shaderProgram, 'fill_color'),
+      }
+    };
+
+    // Generate GPU buffer IDs that will be filled with data later for the shader to use.
+    this.buffers = {
+      pos: gl.createBuffer(),
+    };
+
+    // Set the default clear color.
+    gl.clearColor(0.18, 0.18, 0.18, 1.0);
+  }
+
+  this.init(canvas);
+}
+
+
+
 // Initialize a texture and load an image.
 // When the image finished loading copy it into the texture.
 export function loadTexture(gl, url, cb) {
