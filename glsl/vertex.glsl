@@ -1,4 +1,6 @@
-attribute vec2 v_pos;
+#version 300 es
+
+in vec2 v_pos;
 uniform mat4 mvp;
 
 void main() {

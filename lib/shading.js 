@@ -164,10 +164,10 @@ export function UIRenderer(canvas) {
   this.init = function (canvas) {
 
     // Initialize the GL context.
-    const gl = canvas.getContext('webgl');
+    const gl = canvas.getContext('webgl2');
     if (!gl) {
       // Only continue if WebGL is available and working.
-      alert('Unable to initialize WebGL. Your browser or machine may not support it.');
+      alert('Unable to initialize WebGL. Your browser may not support WebGL2.');
       return;
     }
     this.gl = gl;
@@ -188,8 +188,8 @@ export function UIRenderer(canvas) {
         vertexPos: bind_attr(gl, shaderProgram, 'v_pos'),
       },
       uniforms: {
-        modelViewProj: gl.getUniformLocation(shaderProgram, 'mvp'),
-        fillColor: gl.getUniformLocation(shaderProgram, 'fill_color'),
+        modelViewProj: bind_uniform(gl, shaderProgram, 'mvp'),
+        fillColor: bind_uniform(gl, shaderProgram, 'fill_color'),
       }
     };
 
@@ -265,8 +265,17 @@ export function loadTexture(gl, url, cb) {
 export function bind_attr(gl, program, attr_name) {
   const attr_idx = gl.getAttribLocation(program, attr_name);
   if (attr_idx === -1)
-    console.error("Can not bind attribute'", attr_name, "'for shader.");
+    console.error("Can not bind attribute '", attr_name, "' for shader.");
   return attr_idx;
+}
+
+
+// Get the shader location of an uniform of a shader by name.
+export function bind_uniform(gl, program, attr_name) {
+  const loc = gl.getUniformLocation(program, attr_name);
+  if (loc === null)
+    console.error("Can not bind uniform '", attr_name, "' for shader.");
+  return loc;
 }
 
 

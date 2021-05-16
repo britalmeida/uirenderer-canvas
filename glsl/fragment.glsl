@@ -1,5 +1,10 @@
+#version 300 es
+precision highp float;
+
 uniform highp vec4 fill_color;
 
+out vec4 fragColor;
+
 void main() {
-    gl_FragColor = fill_color;
+    fragColor = fill_color;
 }
