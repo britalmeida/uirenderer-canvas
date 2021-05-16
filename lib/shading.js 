@@ -173,23 +173,10 @@ export function UIRenderer(canvas) {
     this.gl = gl;
 
     // Vertex shader.
-    const vs_source = `
-      attribute vec2 v_pos;
-      uniform mat4 mvp;
-
-      void main() {
-        gl_Position = mvp * vec4(v_pos, 0.0, 1.0);
-      }
-    `;
+    const vs_source = require('./glsl/vertex.glsl');
 
     // Fragment shader.
-    const fs_source = `
-      uniform highp vec4 fill_color;
-
-      void main() {
-        gl_FragColor = fill_color;
-      }
-    `;
+    const fs_source = require('./glsl/fragment.glsl');
 
     // Load and compile shaders.
     const shaderProgram = init_shader_program(gl, vs_source, fs_source);
