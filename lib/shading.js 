@@ -31,12 +31,14 @@ export function Rect (x, y, w, h) {
         this.width + val * 2.0, this.height + val * 2.0);
   }
 
-}
-
-
-function DrawCommand(verts, color) {
-  this.verts = verts;
-  this.color = color;
+  this.encapsulate = function (point) {
+    this.left = Math.min(this.left, point[0]);
+    this.right = Math.max(this.right, point[0]);
+    this.top = Math.min(this.top, point[1]);
+    this.bottom = Math.max(this.bottom, point[1]);
+    this.width = this.right - this.left;
+    this.height = this.bottom - this.top;
+  }
 }
 
 
@@ -46,55 +48,109 @@ export function UIRenderer(canvas) {
   this.gl = null;
 
   // Viewport transform
-  this.rect = [1, 1]; // Size of the view, in pixels.
-                      // Should match the canvas and render buffer size.
   this.transform = [ 1, 0, 0, 0,
-                     0,-1, 0, 0,
+                     0, 1, 0, 0,
                      0, 0, 1, 0,
                      0, 0, 0, 1];
 
   // Shader data
   this.shaderInfo = {};
   this.buffers = {};
-  this.drawList = [];
+  this.cmdData = new Float32Array(4092 * 4); // Pre-allocate commands of 4 floats (128 width).
+  this.cmdDataIdx = 0;
 
-  // Set the background color for the canvas.
-  this.setClearColor = function (r, g, b, a) {
-    this.gl.clearColor(r, g, b, a);
-  }
+  // Command types
+  const CMD_LINE     = 1;
+  const CMD_TRIANGLE = 2;
+  const CMD_RECT     = 3;
+  const CMD_FRAME    = 4;
 
   // Add primitives.
-  this.addRect = function (left, top, width, height, color) {
-    const right = left + width;
-    const bottom = top + height;
-    this.drawList.push(new DrawCommand(new Float32Array([
-        right, top,
-        left,  top,
-        right, bottom,
-        left,  bottom
-      ]), color
-    ));
+  this.addRect = function (left, top, width, height, color, cornerWidth = 0) {
+    const bounds = new Rect(left, top, width, height);
+    let w = this.addPrimitiveShape(CMD_RECT, bounds, color);
+    // Data 3 - Shape parameters
+    this.cmdData[w++] = cornerWidth;
+    w+=3;
+
+    this.cmdDataIdx = w;
+  }
+
+  this.addFrame = function (left, top, width, height, lineWidth, color, cornerWidth = 0) {
+    const bounds = new Rect(left, top, width, height);
+    let w = this.addPrimitiveShape(CMD_FRAME, bounds, color);
+    // Data 3 - Shape parameters
+    this.cmdData[w++] = lineWidth;
+    this.cmdData[w++] = cornerWidth;
+    w+=2;
+
+    this.cmdDataIdx = w;
   }
 
   this.addLine = function (p1, p2, width, color) {
-    const hwidth = width / 2;
-    this.drawList.push(new DrawCommand(new Float32Array([
-        p1[0] + hwidth, p1[1] - hwidth,
-        p1[0] - hwidth, p1[1] - hwidth,
-        p2[0] + hwidth, p2[1] + hwidth,
-        p2[0] - hwidth, p2[1] + hwidth,
-      ]), color
-    ));
+    let bounds = new Rect(p1[0], p1[1], 0, 0);
+    bounds.encapsulate(p2);
+    bounds.widen(width * 0.5);
+    let w = this.addPrimitiveShape(CMD_LINE, bounds, color);
+    // Data 3 - Shape parameters
+    this.cmdData[w++] = p1[0];
+    this.cmdData[w++] = p1[1];
+    this.cmdData[w++] = p2[0];
+    this.cmdData[w++] = p2[1];
+
+    this.cmdDataIdx = w;
   }
 
   this.addTriangle = function (p1, p2, p3, color) {
-    this.drawList.push(new DrawCommand(new Float32Array([
-        p1[0], p1[1],
-        p2[0], p2[1],
-        p3[0], p3[1],
-        p3[0], p3[1],
-      ]), color
-    ));
+    let bounds = new Rect(p1[0], p1[1], 0, 0);
+    bounds.encapsulate(p2);
+    bounds.encapsulate(p3);
+    let w = this.addPrimitiveShape(CMD_TRIANGLE, bounds, color);
+    // Data 3 - Shape parameters
+    this.cmdData[w++] = p1[0];
+    this.cmdData[w++] = p1[1];
+    this.cmdData[w++] = p2[0];
+    this.cmdData[w++] = p2[1];
+    // Data 4 - Shape parameters II
+    this.cmdData[w++] = p3[0];
+    this.cmdData[w++] = p3[1];
+    w+=2;
+
+    this.cmdDataIdx = w;
+  }
+
+  this.addCircle = function (p1, radius, color) {
+    // A circle is a rectangle with very rounded corners.
+    let bounds = new Rect(p1[0], p1[1], 0, 0);
+    bounds.widen(radius);
+    this.addRect(bounds.left, bounds.top, bounds.width, bounds.height, color, radius);
+  }
+
+  this.addCircleFrame = function (p1, radius, lineWidth, color) {
+    // A circle is a rectangle with very rounded corners.
+    let bounds = new Rect(p1[0], p1[1], 0, 0);
+    bounds.widen(radius);
+    this.addFrame(bounds.left, bounds.top, bounds.width, bounds.height, lineWidth, color, radius);
+  }
+
+  this.addPrimitiveShape = function (cmdType, bounds, color) {
+    let w = this.cmdDataIdx;
+    // Data 0 - Header
+    this.cmdData[w++] = cmdType;
+    //w += 3;
+    this.cmdData[w++] =5;
+    this.cmdData[w++] =6;
+    this.cmdData[w++] =7;
+        // Data 1 - Bounds
+    this.cmdData[w++] = bounds.left + 0.5;
+    this.cmdData[w++] = bounds.top + 0.5;
+    this.cmdData[w++] = bounds.right + 0.5 - 1.0;
+    this.cmdData[w++] = bounds.bottom + 0.5 - 1.0;
+    // Data 2 - Color
+    this.cmdData.set(color, w);
+    w += 4;
+    this.cmdDataIdx = w;
+    return w;
   }
 
   // Draw a frame with the current primitive commands.
@@ -103,61 +159,43 @@ export function UIRenderer(canvas) {
 
     // Set this view to occupy the full canvas.
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-    this.rect = [gl.canvas.width, gl.canvas.height];
-
-    // Clear the color buffer with specified clear color.
-    gl.clear(gl.COLOR_BUFFER_BIT);
 
     // Bind the shader.
     gl.useProgram(this.shaderInfo.program);
 
     // Set the transform.
     gl.uniformMatrix4fv(this.shaderInfo.uniforms.modelViewProj, false, this.transform);
+    gl.uniform1f(this.shaderInfo.uniforms.vpHeight, gl.canvas.height);
 
-    // Draw commands.
-    for (const cmd of this.drawList) {
-
-      // Set the color
-      gl.uniform4fv(this.shaderInfo.uniforms.fillColor, cmd.color);
-
-      // Set the geometry
-      const dpi = window.devicePixelRatio;
-      const pixel = {
-        x: 2.0 * dpi / this.rect[0], // Shader clip space is [-1,1], therefore divide 2.
-        y: 2.0 * dpi / this.rect[1]
-      }
-      const positions = new Float32Array([
-        cmd.verts[0] * pixel.x -1, cmd.verts[1] * pixel.y -1,
-        cmd.verts[2] * pixel.x -1, cmd.verts[3] * pixel.y -1,
-        cmd.verts[4] * pixel.x -1, cmd.verts[5] * pixel.y -1,
-        cmd.verts[6] * pixel.x -1, cmd.verts[7] * pixel.y -1,
-      ]);
-
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.pos);
-      gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW); // Transfer data to GPU
-      gl.enableVertexAttribArray(this.shaderInfo.attrs.vertexPos);
-      gl.vertexAttribPointer(
+    // Bind the vertex data for the shader to use and specify how to interpret it.
+    // The shader works as a full size rect, new coordinates don't need to be set per frame.
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.pos);
+    gl.enableVertexAttribArray(this.shaderInfo.attrs.vertexPos);
+    gl.vertexAttribPointer(
         this.shaderInfo.attrs.vertexPos, // Shader attribute index
         2,         // Number of elements per vertex
         gl.FLOAT,  // Data type of each element
         false,     // Normalized?
         0,         // Stride if data is interleaved
         0          // Pointer offset to start of data
-      );
+    );
 
-      // Draw
-      gl.drawArrays(gl.TRIANGLE_STRIP,
+    // Upload the command buffer to the GPU.
+    gl.uniform1i(this.shaderInfo.uniforms.numCmds, this.cmdDataIdx / 4);
+    gl.uniform4fv(this.shaderInfo.uniforms.cmdData, this.cmdData); // Transfer data to GPU
+
+    // Draw
+    gl.drawArrays(gl.TRIANGLE_STRIP,
         0, // Offset.
         4  // Vertex count.
-      );
-    }
+    );
 
     // Unbind the buffers and the shader.
     gl.disableVertexAttribArray(this.shaderInfo.attrs.vertexPos);
     gl.useProgram(null);
 
     // Clear the draw list.
-    this.drawList = [];
+    this.cmdDataIdx = 0;
   }
 
   // Initialize the renderer: compile the shader and setup static data.
@@ -189,17 +227,24 @@ export function UIRenderer(canvas) {
       },
       uniforms: {
         modelViewProj: bind_uniform(gl, shaderProgram, 'mvp'),
-        fillColor: bind_uniform(gl, shaderProgram, 'fill_color'),
+        vpHeight: bind_uniform(gl, shaderProgram, 'viewport_height'),
+        numCmds: bind_uniform(gl, shaderProgram, 'num_cmds'),
+        cmdData: bind_uniform(gl, shaderProgram, 'cmd_data'),
       }
     };
 
     // Generate GPU buffer IDs that will be filled with data later for the shader to use.
     this.buffers = {
       pos: gl.createBuffer(),
+      cmdData: gl.createBuffer(),
     };
 
-    // Set the default clear color.
-    gl.clearColor(0.18, 0.18, 0.18, 1.0);
+    // Set the vertex positions as a full size rect. Done once, never changes.
+    const positions = new Float32Array([
+      1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, -1.0,
+    ]);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.pos);
+    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW); // Transfer data to GPU
   }
 
   this.init(canvas);
