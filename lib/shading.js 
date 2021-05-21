@@ -90,13 +90,16 @@ export function UIRenderer(canvas) {
   this.addLine = function (p1, p2, width, color) {
     let bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.encapsulate(p2);
-    bounds.widen(width * 0.5);
+    bounds.widen(Math.round(width * 0.5 + 0.01));
     let w = this.addPrimitiveShape(CMD_LINE, bounds, color);
     // Data 3 - Shape parameters
     this.cmdData[w++] = p1[0];
     this.cmdData[w++] = p1[1];
     this.cmdData[w++] = p2[0];
     this.cmdData[w++] = p2[1];
+    // Data 4 - Shape parameters II
+    this.cmdData[w++] = width * 0.5;
+    w+=3;
 
     this.cmdDataIdx = w;
   }
@@ -137,15 +140,12 @@ export function UIRenderer(canvas) {
     let w = this.cmdDataIdx;
     // Data 0 - Header
     this.cmdData[w++] = cmdType;
-    //w += 3;
-    this.cmdData[w++] =5;
-    this.cmdData[w++] =6;
-    this.cmdData[w++] =7;
-        // Data 1 - Bounds
-    this.cmdData[w++] = bounds.left + 0.5;
-    this.cmdData[w++] = bounds.top + 0.5;
-    this.cmdData[w++] = bounds.right + 0.5 - 1.0;
-    this.cmdData[w++] = bounds.bottom + 0.5 - 1.0;
+    w += 3;
+    // Data 1 - Bounds
+    this.cmdData[w++] = bounds.left;
+    this.cmdData[w++] = bounds.top;
+    this.cmdData[w++] = bounds.right;
+    this.cmdData[w++] = bounds.bottom;
     // Data 2 - Color
     this.cmdData.set(color, w);
     w += 4;
