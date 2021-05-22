@@ -42,10 +42,13 @@ export function Rect (x, y, w, h) {
 }
 
 
-export function UIRenderer(canvas) {
+export function UIRenderer(canvas, redrawCallback) {
 
   // Rendering context
   this.gl = null;
+
+  // Callback to trigger a redraw of the view component using this renderer.
+  this.redrawCallback = redrawCallback;
 
   // Viewport transform
   this.transform = [ 1, 0, 0, 0,
@@ -58,12 +61,14 @@ export function UIRenderer(canvas) {
   this.buffers = {};
   this.cmdData = new Float32Array(4092 * 4); // Pre-allocate commands of 4 floats (128 width).
   this.cmdDataIdx = 0;
+  this.textureIDs = [];
 
   // Command types
   const CMD_LINE     = 1;
   const CMD_TRIANGLE = 2;
   const CMD_RECT     = 3;
   const CMD_FRAME    = 4;
+  const CMD_IMAGE    = 5;
 
   // Add primitives.
   this.addRect = function (left, top, width, height, color, cornerWidth = 0) {
@@ -136,6 +141,29 @@ export function UIRenderer(canvas) {
     this.addFrame(bounds.left, bounds.top, bounds.width, bounds.height, lineWidth, color, radius);
   }
 
+  this.addImage = function (left, top, width, height, textureID, cornerWidth = 0, alpha = 1.0) {
+    // Push texture GPU ID.
+    if (this.textureIDs.length >= this.shaderInfo.uniforms.samplers.length) {
+      console.warn("Maximum number of single images exceeded. Images need to be atlased.");
+      // Bail out. Do not try to render an image that can't be bound to the shader.
+      return;
+    }
+    if (!this.gl.isTexture(textureID)) {
+      console.warn("Image texture was not created. Call uiRenderer.loadImage()");
+      return;
+    }
+    const texture_unit = this.textureIDs.push(textureID) - 1;
+
+    const bounds = new Rect(left, top, width, height);
+    let w = this.addPrimitiveShape(CMD_IMAGE, bounds, [1.0, 1.0, 1.0, alpha]);
+    // Data 3 - Shape parameters
+    this.cmdData[w++] = cornerWidth;
+    this.cmdData[w++] = texture_unit;
+    w+=2;
+
+    this.cmdDataIdx = w;
+  }
+
   this.addPrimitiveShape = function (cmdType, bounds, color) {
     let w = this.cmdDataIdx;
     // Data 0 - Header
@@ -151,6 +179,50 @@ export function UIRenderer(canvas) {
     w += 4;
     this.cmdDataIdx = w;
     return w;
+  }
+
+  // Create a GPU texture object (returns the ID, usable immediately) and
+  // asynchronously load the image data from the given url onto it.
+  this.loadImage = function (url) {
+    const gl = this.gl;
+    const redrawCallback = this.redrawCallback;
+
+    const textureID = gl.createTexture(); // Generate texture object ID.
+    gl.bindTexture(gl.TEXTURE_2D, textureID); // Create texture object with ID.
+
+    // Populate the texture object with a 1px placeholder so it can be accessed while the
+    // image loads (async). Use re-allocatable GPU memory as the final resolution is unknown.
+    const level = 0;
+    const internalFormat = gl.RGBA;
+    const srcFormat = gl.RGBA;
+    const srcType = gl.UNSIGNED_BYTE;
+    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
+        1, 1, // width, height
+        0, // border
+        srcFormat, srcType,
+        new Uint8Array([80, 0, 80, 255]));
+
+    // Create a JS image that asynchronously loads the given url and transfers
+    // the image data to GPU once that is done.
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = function() {
+      gl.bindTexture(gl.TEXTURE_2D, textureID);
+      gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
+          srcFormat, srcType, image);
+
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+      // Trigger a redraw of the component view that uses this renderer.
+      redrawCallback();
+    }
+
+    image.src = url;
+    return textureID;
   }
 
   // Draw a frame with the current primitive commands.
@@ -184,6 +256,14 @@ export function UIRenderer(canvas) {
     gl.uniform1i(this.shaderInfo.uniforms.numCmds, this.cmdDataIdx / 4);
     gl.uniform4fv(this.shaderInfo.uniforms.cmdData, this.cmdData); // Transfer data to GPU
 
+    // Bind the textures
+    for (let i = 0; i < this.textureIDs.length; i++) {
+      const textureUnit = 0 + i;
+      gl.activeTexture(gl.TEXTURE0 + textureUnit); // Set context to use TextureUnit X
+      gl.bindTexture(gl.TEXTURE_2D, this.textureIDs[i]); // Bind the texture to the active TextureUnit
+      gl.uniform1i(this.shaderInfo.uniforms.samplers[i], textureUnit); // Set shader sampler to use TextureUnit X
+    }
+
     // Draw
     gl.drawArrays(gl.TRIANGLE_STRIP,
         0, // Offset.
@@ -196,6 +276,7 @@ export function UIRenderer(canvas) {
 
     // Clear the draw list.
     this.cmdDataIdx = 0;
+    this.textureIDs = [];
   }
 
   // Initialize the renderer: compile the shader and setup static data.
@@ -210,13 +291,11 @@ export function UIRenderer(canvas) {
     }
     this.gl = gl;
 
-    // Vertex shader.
+    // Load the vertex and fragment shader sources.
     const vs_source = require('./glsl/vertex.glsl');
-
-    // Fragment shader.
     const fs_source = require('./glsl/fragment.glsl');
 
-    // Load and compile shaders.
+    // Load the shader code onto the GPU and compile shaders.
     const shaderProgram = init_shader_program(gl, vs_source, fs_source);
 
     // Collect the shader's attribute locations.
@@ -230,6 +309,13 @@ export function UIRenderer(canvas) {
         vpHeight: bind_uniform(gl, shaderProgram, 'viewport_height'),
         numCmds: bind_uniform(gl, shaderProgram, 'num_cmds'),
         cmdData: bind_uniform(gl, shaderProgram, 'cmd_data'),
+        samplers: [
+          bind_uniform(gl, shaderProgram, 'sampler0'),
+          bind_uniform(gl, shaderProgram, 'sampler1'),
+          bind_uniform(gl, shaderProgram, 'sampler2'),
+          bind_uniform(gl, shaderProgram, 'sampler3'),
+          bind_uniform(gl, shaderProgram, 'sampler4'),
+        ],
       }
     };
 
