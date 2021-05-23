@@ -1,5 +1,6 @@
 #version 300 es
 precision highp float;
+precision highp sampler2DArray;
 
 // Command types
 const int CMD_LINE     = 1;
@@ -13,6 +14,9 @@ uniform float viewport_height;
 uniform int num_cmds;
 uniform vec4 cmd_data[4092];
 
+uniform sampler2DArray bundle_sampler0;
+uniform sampler2DArray bundle_sampler1;
+uniform sampler2DArray bundle_sampler2;
 uniform sampler2D sampler0;
 uniform sampler2D sampler1;
 uniform sampler2D sampler2;
@@ -30,12 +34,15 @@ float scalar_triple_product(vec2 a, vec2 b, vec3 c) {
 float dot2(vec2 v) { return dot(v, v); }
 float dot2(vec3 v) { return dot(v, v); }
 
-vec4 sample_texture(int sampler_ID, vec2 tex_coord) {
+vec4 sample_texture(int sampler_ID, vec2 tex_coord, float slice) {
   if      (sampler_ID == 0) return texture(sampler0, tex_coord);
   else if (sampler_ID == 1) return texture(sampler1, tex_coord);
   else if (sampler_ID == 2) return texture(sampler2, tex_coord);
   else if (sampler_ID == 3) return texture(sampler3, tex_coord);
   else if (sampler_ID == 4) return texture(sampler4, tex_coord);
+  else if (sampler_ID == 10) return texture(bundle_sampler0, vec3(tex_coord.x, tex_coord.y, slice));
+  else if (sampler_ID == 11) return texture(bundle_sampler1, vec3(tex_coord.x, tex_coord.y, slice));
+  else if (sampler_ID == 12) return texture(bundle_sampler2, vec3(tex_coord.x, tex_coord.y, slice));
   return texture(sampler0, tex_coord);
 }
 
@@ -182,10 +189,11 @@ void main() {
       // Color of each fragment is given by a texture lookup.
       float alpha = shape_color.a;
       int sampler_idx = int(shape_def[1]);
+      float slice = shape_def[2]; // Used for texture arrays only.
       vec2 tex_coord = vec2(
         (frag_coord.x - rect.x) / (rect.z - rect.x),
         (frag_coord.y - rect.y) / (rect.w - rect.y));
-      shape_color = sample_texture(sampler_idx, tex_coord);
+      shape_color = sample_texture(sampler_idx, tex_coord, slice);
       shape_color.a *= alpha;
     }
 

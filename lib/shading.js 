@@ -62,6 +62,7 @@ export function UIRenderer(canvas, redrawCallback) {
   this.cmdData = new Float32Array(4092 * 4); // Pre-allocate commands of 4 floats (128 width).
   this.cmdDataIdx = 0;
   this.textureIDs = [];
+  this.textureBundleIDs = [];
 
   // Command types
   const CMD_LINE     = 1;
@@ -152,14 +153,44 @@ export function UIRenderer(canvas, redrawCallback) {
       console.warn("Image texture was not created. Call uiRenderer.loadImage()");
       return;
     }
-    const texture_unit = this.textureIDs.push(textureID) - 1;
+    const textureUnit = this.textureIDs.push(textureID) - 1;
 
+    this.addImageInternal(left, top, width, height, textureID, textureUnit, 0, cornerWidth, alpha);
+  }
+
+  this.addImageFromBundle = function (left, top, width, height, textureID, slice, cornerWidth = 0, alpha = 1.0) {
+    // Push texture GPU ID.
+    let textureUnit = 10;
+    const idx = this.textureBundleIDs.indexOf(textureID);
+
+    // An image from this bundle was not requested yet. Add the bundle to the bind list.
+    if (idx == -1) {
+      if (this.textureBundleIDs.length >= this.shaderInfo.uniforms.bundleSamplers.length) {
+        console.warn("Maximum number of image bundles exceeded. Increase supported amount in code?");
+        // Bail out. Do not try to render an image that can't be bound to the shader.
+        return;
+      }
+      if (!this.gl.isTexture(textureID)) {
+        console.warn("Image texture was not created. Call uiRenderer.loadImage()");
+        return;
+      }
+      textureUnit += this.textureBundleIDs.push(textureID) - 1;
+    } else {
+      // This texture bundle was already requested.
+      textureUnit += idx;
+    }
+
+    this.addImageInternal(left, top, width, height, textureID, textureUnit, slice, cornerWidth, alpha);
+  }
+
+  this.addImageInternal = function (left, top, width, height, textureID, textureUnit, slice, cornerWidth, alpha) {
     const bounds = new Rect(left, top, width, height);
     let w = this.addPrimitiveShape(CMD_IMAGE, bounds, [1.0, 1.0, 1.0, alpha]);
     // Data 3 - Shape parameters
     this.cmdData[w++] = cornerWidth;
-    this.cmdData[w++] = texture_unit;
-    w+=2;
+    this.cmdData[w++] = textureUnit;
+    this.cmdData[w++] = slice;
+    w+=1;
 
     this.cmdDataIdx = w;
   }
@@ -225,6 +256,47 @@ export function UIRenderer(canvas, redrawCallback) {
     return textureID;
   }
 
+  // Create a GPU texture object (returns the ID, usable immediately) and asynchronously load
+  // the image data from all the given urls as slices. All images must have the same resolution
+  // and can be indexed later in the order they were given.
+  this.loadImageBundle = function (urls, resolution) {
+    const gl = this.gl;
+    const redrawCallback = this.redrawCallback;
+
+    // Create a texture object with the given resolution and a slice per given URL.
+    // Use GPU memory of immutable size.
+    console.log("Creating texture bundle (", resolution[0], "x", resolution[1], ") with", urls.length, "textures");
+    const textureID = gl.createTexture(); // Generate texture object ID.
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, textureID); // Create texture object with ID.
+    gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8, resolution[0], resolution[1], urls.length);
+
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    // Create a JS image per given URL that asynchronously loads it and transfers
+    // the image data to its slice on the GPU array texture once that is done.
+    for (let i = 0; i < urls.length; i++) {
+      const image = new Image();
+      image.crossOrigin = "anonymous";
+      image.onload = function () {
+        gl.bindTexture(gl.TEXTURE_2D_ARRAY, textureID);
+        gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0,
+            0, 0, i, // 0 xy offset, start writing at slide i.
+            resolution[0], resolution[1], 1, // 1 full-size slice.
+            gl.RGBA, gl.UNSIGNED_BYTE, image);
+
+        // Trigger a redraw of the component view that uses this renderer.
+        redrawCallback();
+      }
+
+      image.src = urls[i];
+    }
+
+    return textureID;
+  }
+
   // Draw a frame with the current primitive commands.
   this.draw = function() {
     const gl = this.gl;
@@ -256,12 +328,19 @@ export function UIRenderer(canvas, redrawCallback) {
     gl.uniform1i(this.shaderInfo.uniforms.numCmds, this.cmdDataIdx / 4);
     gl.uniform4fv(this.shaderInfo.uniforms.cmdData, this.cmdData); // Transfer data to GPU
 
-    // Bind the textures
+    // Bind the isolated textures.
     for (let i = 0; i < this.textureIDs.length; i++) {
-      const textureUnit = 0 + i;
+      const textureUnit = 1 + i; // Note: leave unit 0 for random operations.
       gl.activeTexture(gl.TEXTURE0 + textureUnit); // Set context to use TextureUnit X
       gl.bindTexture(gl.TEXTURE_2D, this.textureIDs[i]); // Bind the texture to the active TextureUnit
       gl.uniform1i(this.shaderInfo.uniforms.samplers[i], textureUnit); // Set shader sampler to use TextureUnit X
+    }
+    // Bind the "bundled" textures (texture arrays).
+    for (let i = 0; i < this.textureBundleIDs.length; i++) {
+      const textureUnit = 10 + i; // Offset from the single image samplers.
+      gl.activeTexture(gl.TEXTURE0 + textureUnit);
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.textureBundleIDs[i]);
+      gl.uniform1i(this.shaderInfo.uniforms.bundleSamplers[i], textureUnit);
     }
 
     // Draw
@@ -277,6 +356,7 @@ export function UIRenderer(canvas, redrawCallback) {
     // Clear the draw list.
     this.cmdDataIdx = 0;
     this.textureIDs = [];
+    this.textureBundleIDs = [];
   }
 
   // Initialize the renderer: compile the shader and setup static data.
@@ -315,6 +395,11 @@ export function UIRenderer(canvas, redrawCallback) {
           bind_uniform(gl, shaderProgram, 'sampler2'),
           bind_uniform(gl, shaderProgram, 'sampler3'),
           bind_uniform(gl, shaderProgram, 'sampler4'),
+        ],
+        bundleSamplers : [
+          bind_uniform(gl, shaderProgram, 'bundle_sampler0'),
+          bind_uniform(gl, shaderProgram, 'bundle_sampler1'),
+          bind_uniform(gl, shaderProgram, 'bundle_sampler2'),
         ],
       }
     };
