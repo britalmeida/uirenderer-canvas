@@ -56,6 +56,8 @@ export function UIRenderer(canvas, redrawCallback) {
   this.buffers = {};
   this.cmdData = new Float32Array(4092 * 4); // Pre-allocate commands of 4 floats (128 width).
   this.cmdDataIdx = 0;
+  this.fallback2DTextureID = null;
+  this.fallbackArrayTextureID = null;
   this.textureIDs = [];
   this.textureBundleIDs = [];
 
@@ -138,52 +140,52 @@ export function UIRenderer(canvas, redrawCallback) {
   }
 
   this.addImage = function (left, top, width, height, textureID, cornerWidth = 0, alpha = 1.0) {
-    // Push texture GPU ID.
-    if (this.textureIDs.length >= this.shaderInfo.uniforms.samplers.length) {
-      console.warn("Maximum number of single images exceeded. Images need to be atlased.");
-      // Bail out. Do not try to render an image that can't be bound to the shader.
-      return;
-    }
-    if (!this.gl.isTexture(textureID)) {
-      console.warn("Image texture was not created. Call uiRenderer.loadImage()");
-      return;
-    }
-    const textureUnit = this.textureIDs.push(textureID) - 1;
-
-    this.addImageInternal(left, top, width, height, textureID, textureUnit, 0, cornerWidth, alpha);
+    const samplerIdx = this.pushTextureID(textureID,
+        this.textureIDs, this.shaderInfo.uniforms.samplers, this.fallback2DTextureID,
+        "Maximum number of single images exceeded. Images need to be bundled.");
+    this.addImageInternal(left, top, width, height, samplerIdx, 0, cornerWidth, alpha);
   }
 
   this.addImageFromBundle = function (left, top, width, height, textureID, slice, cornerWidth = 0, alpha = 1.0) {
-    // Push texture GPU ID.
-    let textureUnit = 10;
-    const idx = this.textureBundleIDs.indexOf(textureID);
+    const samplerIdx = 10 + this.pushTextureID(textureID,
+        this.textureBundleIDs, this.shaderInfo.uniforms.bundleSamplers, this.fallbackArrayTextureID,
+        "Maximum number of image bundles exceeded. Increase supported amount in code?");
+    this.addImageInternal(left, top, width, height, samplerIdx, slice, cornerWidth, alpha);
+  }
 
-    // An image from this bundle was not requested yet. Add the bundle to the bind list.
+  // Add the given texture ID to the list of textures that will be used this frame.
+  this.pushTextureID = function (textureID, texturesToDraw, samplersList, fallbackTextureID, limitExceededMsg) {
+    let samplerIdx = 0;
+    const idx = texturesToDraw.indexOf(textureID);
     if (idx == -1) {
-      if (this.textureBundleIDs.length >= this.shaderInfo.uniforms.bundleSamplers.length) {
-        console.warn("Maximum number of image bundles exceeded. Increase supported amount in code?");
+      // This texture was not requested yet. Add it to the bind list.
+
+      if (texturesToDraw.length >= samplersList.length) {
         // Bail out. Do not try to render an image that can't be bound to the shader.
+        console.warn(limitExceededMsg);
         return;
       }
       if (!this.gl.isTexture(textureID)) {
-        console.warn("Image texture was not created. Call uiRenderer.loadImage()");
-        return;
+        // The requested texture is invalid (not created or populated yet). Fallback to the default one.
+        const fallbackTexIdx = texturesToDraw.indexOf(fallbackTextureID);
+        samplerIdx += (fallbackTexIdx == -1) ? texturesToDraw.push(fallbackTextureID) - 1 : fallbackTexIdx;
+      } else {
+        samplerIdx += texturesToDraw.push(textureID) - 1;
       }
-      textureUnit += this.textureBundleIDs.push(textureID) - 1;
     } else {
-      // This texture bundle was already requested.
-      textureUnit += idx;
+      // This texture was already requested.
+      samplerIdx += idx;
     }
 
-    this.addImageInternal(left, top, width, height, textureID, textureUnit, slice, cornerWidth, alpha);
+    return samplerIdx;
   }
 
-  this.addImageInternal = function (left, top, width, height, textureID, textureUnit, slice, cornerWidth, alpha) {
+  this.addImageInternal = function (left, top, width, height, samplerIdx, slice, cornerWidth, alpha) {
     const bounds = new Rect(left, top, width, height);
     let w = this.addPrimitiveShape(CMD_IMAGE, bounds, [1.0, 1.0, 1.0, alpha]);
     // Data 3 - Shape parameters
     this.cmdData[w++] = cornerWidth;
-    this.cmdData[w++] = textureUnit;
+    this.cmdData[w++] = samplerIdx;
     this.cmdData[w++] = slice;
     w+=1;
 
@@ -325,17 +327,19 @@ export function UIRenderer(canvas, redrawCallback) {
     gl.uniform4fv(this.shaderInfo.uniforms.cmdData, this.cmdData); // Transfer data to GPU
 
     // Bind the isolated textures.
-    for (let i = 0; i < this.textureIDs.length; i++) {
+    for (let i = 0; i < this.shaderInfo.uniforms.samplers.length; i++) {
       const textureUnit = 1 + i; // Note: leave unit 0 for random operations.
+      const textureID = i < this.textureIDs.length ? this.textureIDs[i] : this.fallback2DTextureID;
       gl.activeTexture(gl.TEXTURE0 + textureUnit); // Set context to use TextureUnit X
-      gl.bindTexture(gl.TEXTURE_2D, this.textureIDs[i]); // Bind the texture to the active TextureUnit
+      gl.bindTexture(gl.TEXTURE_2D, textureID); // Bind the texture to the active TextureUnit
       gl.uniform1i(this.shaderInfo.uniforms.samplers[i], textureUnit); // Set shader sampler to use TextureUnit X
     }
     // Bind the "bundled" textures (texture arrays).
-    for (let i = 0; i < this.textureBundleIDs.length; i++) {
+    for (let i = 0; i < this.shaderInfo.uniforms.bundleSamplers.length; i++) {
       const textureUnit = 10 + i; // Offset from the single image samplers.
+      const textureID = i < this.textureBundleIDs.length ? this.textureBundleIDs[i] : this.fallbackArrayTextureID;
       gl.activeTexture(gl.TEXTURE0 + textureUnit);
-      gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.textureBundleIDs[i]);
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, textureID);
       gl.uniform1i(this.shaderInfo.uniforms.bundleSamplers[i], textureUnit);
     }
 
@@ -399,6 +403,34 @@ export function UIRenderer(canvas, redrawCallback) {
         ],
       }
     };
+
+    // Create default fallback textures.
+    {
+      // Create 1px textures to use as fallback while the real textures are loading
+      // asynchronously and for unused shader sampler binding points.
+      gl.activeTexture(gl.TEXTURE0);
+      const pixel_data = new Uint8Array([80, 30, 80, 210]); // Single grey pixel.
+      // 2D texture.
+      this.fallback2DTextureID = gl.createTexture(); // Generate texture object ID.
+      gl.bindTexture(gl.TEXTURE_2D, this.fallback2DTextureID); // Create texture object with ID.
+      gl.texStorage2D(gl.TEXTURE_2D, // Allocate immutable storage.
+        1, // Number of mip map levels.
+        gl.RGBA8, // GPU internal format.
+        1, 1); // Width, height.
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, // Transfer data
+        0, 0, 1, 1, // x,y offsets, width, height.
+        gl.RGBA, gl.UNSIGNED_BYTE, // Source format and type.
+          pixel_data); // Single grey pixel.
+      // 2D array texture ("bundle").
+      this.fallbackArrayTextureID = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.fallbackArrayTextureID);
+      gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8,
+        1, 1, 1); // Width, height, slices.
+      gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0,
+          0, 0, 0, // x,y,slice offsets.
+          1, 1, 1, // width, height, number of slices to write.
+          gl.RGBA, gl.UNSIGNED_BYTE, pixel_data);
+    }
 
     // Generate GPU buffer IDs that will be filled with data later for the shader to use.
     this.buffers = {
