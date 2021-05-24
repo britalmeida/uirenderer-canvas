@@ -12,7 +12,9 @@ const int CMD_IMAGE    = 5;
 // Inputs
 uniform float viewport_height;
 uniform int num_cmds;
-uniform vec4 cmd_data[4092];
+layout(std140) uniform CmdDataBlock {
+  vec4 cmd_data[4096];
+};
 
 uniform sampler2DArray bundle_sampler0;
 uniform sampler2DArray bundle_sampler1;

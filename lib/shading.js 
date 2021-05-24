@@ -54,7 +54,7 @@ export function UIRenderer(canvas, redrawCallback) {
   // Shader data
   this.shaderInfo = {};
   this.buffers = {};
-  this.cmdData = new Float32Array(4092 * 4); // Pre-allocate commands of 4 floats (128 width).
+  this.cmdData = new Float32Array(4096 * 4); // Pre-allocate commands of 4 floats (128 width).
   this.cmdDataIdx = 0;
   this.fallback2DTextureID = null;
   this.fallbackArrayTextureID = null;
@@ -323,8 +323,11 @@ export function UIRenderer(canvas, redrawCallback) {
     );
 
     // Upload the command buffer to the GPU.
-    gl.uniform1i(this.shaderInfo.uniforms.numCmds, this.cmdDataIdx / 4);
-    gl.uniform4fv(this.shaderInfo.uniforms.cmdData, this.cmdData); // Transfer data to GPU
+    const numCmds = this.cmdDataIdx / 4;
+    // console.log(numCmds);
+    gl.uniform1i(this.shaderInfo.uniforms.numCmds, numCmds);
+    gl.bindBuffer(gl.UNIFORM_BUFFER, this.buffers.cmdData);
+    gl.bufferSubData(gl.UNIFORM_BUFFER, 0, this.cmdData, 0, numCmds * 16);
 
     // Bind the isolated textures.
     for (let i = 0; i < this.shaderInfo.uniforms.samplers.length; i++) {
@@ -351,6 +354,8 @@ export function UIRenderer(canvas, redrawCallback) {
 
     // Unbind the buffers and the shader.
     gl.disableVertexAttribArray(this.shaderInfo.attrs.vertexPos);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.bindBuffer(gl.UNIFORM_BUFFER, null);
     gl.useProgram(null);
 
     // Clear the draw list.
@@ -388,7 +393,6 @@ export function UIRenderer(canvas, redrawCallback) {
         modelViewProj: bind_uniform(gl, shaderProgram, 'mvp'),
         vpHeight: bind_uniform(gl, shaderProgram, 'viewport_height'),
         numCmds: bind_uniform(gl, shaderProgram, 'num_cmds'),
-        cmdData: bind_uniform(gl, shaderProgram, 'cmd_data'),
         samplers: [
           bind_uniform(gl, shaderProgram, 'sampler0'),
           bind_uniform(gl, shaderProgram, 'sampler1'),
@@ -401,7 +405,10 @@ export function UIRenderer(canvas, redrawCallback) {
           bind_uniform(gl, shaderProgram, 'bundle_sampler1'),
           bind_uniform(gl, shaderProgram, 'bundle_sampler2'),
         ],
-      }
+      },
+      uniformBlocks: {
+        cmdData: gl.getUniformBlockIndex(shaderProgram, "CmdDataBlock"),
+      },
     };
 
     // Create default fallback textures.
@@ -435,6 +442,9 @@ export function UIRenderer(canvas, redrawCallback) {
     // Generate GPU buffer IDs that will be filled with data later for the shader to use.
     this.buffers = {
       pos: gl.createBuffer(),
+      // Sadly, WebGL2 does not support Buffer Textures (no gl.texBuffer() or gl.TEXTURE_BUFFER target).
+      // It doesn't support 1D textures either. We're left with a UBO or a 2D image for command data storage.
+      // As it doesn't support image samplers either, I chose a UBO.
       cmdData: gl.createBuffer(),
     };
 
@@ -444,6 +454,13 @@ export function UIRenderer(canvas, redrawCallback) {
     ]);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.pos);
     gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW); // Transfer data to GPU
+
+    const shaderIdx = this.shaderInfo.uniformBlocks.cmdData;
+    gl.bindBuffer(gl.UNIFORM_BUFFER, this.buffers.cmdData);
+    gl.bufferData(gl.UNIFORM_BUFFER, 4096 * 16, gl.DYNAMIC_DRAW);
+    gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, this.buffers.cmdData);
+    gl.bindBuffer(gl.UNIFORM_BUFFER, null);
+    gl.uniformBlockBinding(shaderProgram, shaderIdx, 0); // Bind only once, it won't change.
   }
 
   this.init(canvas);
