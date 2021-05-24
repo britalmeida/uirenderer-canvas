@@ -60,6 +60,7 @@ export function UIRenderer(canvas, redrawCallback) {
   this.fallbackArrayTextureID = null;
   this.textureIDs = [];
   this.textureBundleIDs = [];
+  this.loadingTextureIDs = [];
 
   // Command types
   const CMD_LINE     = 1;
@@ -165,7 +166,7 @@ export function UIRenderer(canvas, redrawCallback) {
         console.warn(limitExceededMsg);
         return;
       }
-      if (!this.gl.isTexture(textureID)) {
+      if (!this.gl.isTexture(textureID) || this.loadingTextureIDs.indexOf(textureID) !== -1) {
         // The requested texture is invalid (not created or populated yet). Fallback to the default one.
         const fallbackTexIdx = texturesToDraw.indexOf(fallbackTextureID);
         samplerIdx += (fallbackTexIdx === -1) ? texturesToDraw.push(fallbackTextureID) - 1 : fallbackTexIdx;
@@ -215,21 +216,11 @@ export function UIRenderer(canvas, redrawCallback) {
   this.loadImage = function (url) {
     const gl = this.gl;
     const redrawCallback = this.redrawCallback;
+    const loadingTextureIDs = this.loadingTextureIDs;
 
     const textureID = gl.createTexture(); // Generate texture object ID.
     gl.bindTexture(gl.TEXTURE_2D, textureID); // Create texture object with ID.
-
-    // Populate the texture object with a 1px placeholder so it can be accessed while the
-    // image loads (async). Use re-allocatable GPU memory as the final resolution is unknown.
-    const level = 0;
-    const internalFormat = gl.RGBA;
-    const srcFormat = gl.RGBA;
-    const srcType = gl.UNSIGNED_BYTE;
-    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
-        1, 1, // width, height
-        0, // border
-        srcFormat, srcType,
-        new Uint8Array([80, 0, 80, 255]));
+    loadingTextureIDs.push(textureID);
 
     // Create a JS image that asynchronously loads the given url and transfers
     // the image data to GPU once that is done.
@@ -237,14 +228,17 @@ export function UIRenderer(canvas, redrawCallback) {
     image.crossOrigin = "anonymous";
     image.onload = function() {
       gl.bindTexture(gl.TEXTURE_2D, textureID);
-      gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
-          srcFormat, srcType, image);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, // Mipmap level, internal format.
+          gl.RGBA, gl.UNSIGNED_BYTE, image); // Source format and type.
 
       gl.generateMipmap(gl.TEXTURE_2D);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+      const idx = loadingTextureIDs.indexOf(textureID);
+      if (idx > -1) { loadingTextureIDs.splice(idx, 1); }
 
       // Trigger a redraw of the component view that uses this renderer.
       redrawCallback();
@@ -416,7 +410,7 @@ export function UIRenderer(canvas, redrawCallback) {
       // Create 1px textures to use as fallback while the real textures are loading
       // asynchronously and for unused shader sampler binding points.
       gl.activeTexture(gl.TEXTURE0);
-      const pixel_data = new Uint8Array([80, 30, 80, 210]); // Single grey pixel.
+      const pixel_data = new Uint8Array([80, 80, 80, 210]); // Single grey pixel.
       // 2D texture.
       this.fallback2DTextureID = gl.createTexture(); // Generate texture object ID.
       gl.bindTexture(gl.TEXTURE_2D, this.fallback2DTextureID); // Create texture object with ID.
