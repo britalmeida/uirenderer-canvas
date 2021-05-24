@@ -157,7 +157,7 @@ export function UIRenderer(canvas, redrawCallback) {
   this.pushTextureID = function (textureID, texturesToDraw, samplersList, fallbackTextureID, limitExceededMsg) {
     let samplerIdx = 0;
     const idx = texturesToDraw.indexOf(textureID);
-    if (idx == -1) {
+    if (idx === -1) {
       // This texture was not requested yet. Add it to the bind list.
 
       if (texturesToDraw.length >= samplersList.length) {
@@ -168,7 +168,7 @@ export function UIRenderer(canvas, redrawCallback) {
       if (!this.gl.isTexture(textureID)) {
         // The requested texture is invalid (not created or populated yet). Fallback to the default one.
         const fallbackTexIdx = texturesToDraw.indexOf(fallbackTextureID);
-        samplerIdx += (fallbackTexIdx == -1) ? texturesToDraw.push(fallbackTextureID) - 1 : fallbackTexIdx;
+        samplerIdx += (fallbackTexIdx === -1) ? texturesToDraw.push(fallbackTextureID) - 1 : fallbackTexIdx;
       } else {
         samplerIdx += texturesToDraw.push(textureID) - 1;
       }
