@@ -41,6 +41,7 @@ export function UIRenderer(canvas, redrawCallback) {
 
   // Rendering context
   this.gl = null;
+  const MAX_CMDS = 4096; // Note: hardcoded on the shader side as well.
 
   // Callback to trigger a redraw of the view component using this renderer.
   this.redrawCallback = redrawCallback;
@@ -54,7 +55,7 @@ export function UIRenderer(canvas, redrawCallback) {
   // Shader data
   this.shaderInfo = {};
   this.buffers = {};
-  this.cmdData = new Float32Array(4096 * 4); // Pre-allocate commands of 4 floats (128 width).
+  this.cmdData = new Float32Array(MAX_CMDS * 4); // Pre-allocate commands of 4 floats (128 width).
   this.cmdDataIdx = 0;
   this.fallback2DTextureID = null;
   this.fallbackArrayTextureID = null;
@@ -195,6 +196,12 @@ export function UIRenderer(canvas, redrawCallback) {
 
   this.addPrimitiveShape = function (cmdType, bounds, color) {
     let w = this.cmdDataIdx;
+    // Check for at least 5 free command slots as that's the maximum a shape might need.
+    if (w/4 + 5 > MAX_CMDS) {
+      console.warn("Too many shapes to draw.", w/4 + 5, "of", MAX_CMDS);
+      // Overwrite the start of the command buffer.
+      return 0;
+    }
     // Data 0 - Header
     this.cmdData[w++] = cmdType;
     w += 3;
@@ -318,7 +325,7 @@ export function UIRenderer(canvas, redrawCallback) {
 
     // Upload the command buffer to the GPU.
     const numCmds = this.cmdDataIdx / 4;
-    // console.log(numCmds);
+    //console.log(numCmds);
     gl.uniform1i(this.shaderInfo.uniforms.numCmds, numCmds);
     gl.bindBuffer(gl.UNIFORM_BUFFER, this.buffers.cmdData);
     gl.bufferSubData(gl.UNIFORM_BUFFER, 0, this.cmdData, 0, numCmds * 16);
@@ -451,7 +458,7 @@ export function UIRenderer(canvas, redrawCallback) {
 
     const shaderIdx = this.shaderInfo.uniformBlocks.cmdData;
     gl.bindBuffer(gl.UNIFORM_BUFFER, this.buffers.cmdData);
-    gl.bufferData(gl.UNIFORM_BUFFER, 4096 * 16, gl.DYNAMIC_DRAW);
+    gl.bufferData(gl.UNIFORM_BUFFER, MAX_CMDS * 16, gl.DYNAMIC_DRAW);
     gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, this.buffers.cmdData);
     gl.bindBuffer(gl.UNIFORM_BUFFER, null);
     gl.uniformBlockBinding(shaderProgram, shaderIdx, 0); // Bind only once, it won't change.
