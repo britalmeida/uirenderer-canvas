@@ -261,6 +261,7 @@ export function UIRenderer(canvas, redrawCallback) {
   this.loadImageBundle = function (urls, resolution) {
     const gl = this.gl;
     const redrawCallback = this.redrawCallback;
+    let loadedSlices = 0;
 
     // Create a texture object with the given resolution and a slice per given URL.
     // Use GPU memory of immutable size.
@@ -279,6 +280,7 @@ export function UIRenderer(canvas, redrawCallback) {
     for (let i = 0; i < urls.length; i++) {
       const image = new Image();
       image.crossOrigin = "anonymous";
+
       image.onload = function () {
         gl.bindTexture(gl.TEXTURE_2D_ARRAY, textureID);
         gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0,
@@ -287,7 +289,10 @@ export function UIRenderer(canvas, redrawCallback) {
             gl.RGBA, gl.UNSIGNED_BYTE, image);
 
         // Trigger a redraw of the component view that uses this renderer.
-        redrawCallback();
+        loadedSlices++;
+        if (loadedSlices === urls.length) {
+          redrawCallback();
+        }
       }
 
       image.src = urls[i];
