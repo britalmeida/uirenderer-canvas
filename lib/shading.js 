@@ -333,7 +333,7 @@ export function UIRenderer(canvas, redrawCallback) {
     //console.log(numCmds);
     gl.uniform1i(this.shaderInfo.uniforms.numCmds, numCmds);
     gl.bindBuffer(gl.UNIFORM_BUFFER, this.buffers.cmdData);
-    gl.bufferSubData(gl.UNIFORM_BUFFER, 0, this.cmdData, 0, numCmds * 16);
+    gl.bufferSubData(gl.UNIFORM_BUFFER, 0, this.cmdData, 0, this.cmdDataIdx);
 
     // Bind the isolated textures.
     for (let i = 0; i < this.shaderInfo.uniforms.samplers.length; i++) {
