@@ -12,9 +12,7 @@ const int CMD_IMAGE    = 5;
 // Inputs
 uniform float viewport_height;
 uniform int num_cmds;
-layout(std140) uniform CmdDataBlock {
-  vec4 cmd_data[4096];
-};
+uniform sampler2D cmd_data;
 
 uniform sampler2DArray bundle_sampler0;
 uniform sampler2DArray bundle_sampler1;
@@ -35,6 +33,11 @@ float scalar_triple_product(vec2 a, vec2 b, vec3 c) {
 }
 float dot2(vec2 v) { return dot(v, v); }
 float dot2(vec3 v) { return dot(v, v); }
+
+vec4 get_cmd_data(int data_idx) {
+  ivec2 tex_coord = ivec2(data_idx % 8192, int(data_idx / 8192));
+  return texelFetch(cmd_data, tex_coord, 0);
+}
 
 vec4 sample_texture(int sampler_ID, vec2 tex_coord, float slice) {
   if      (sampler_ID == 0) return texture(sampler0, tex_coord);
@@ -112,11 +115,11 @@ void main() {
   int data_idx = 0;
   while (data_idx < num_cmds) {
 
-    vec4 cmd = cmd_data[data_idx++];
+    vec4 cmd = get_cmd_data(data_idx++);
     int cmd_type = int(cmd[0]);
 
-    vec4 shape_bounds = cmd_data[data_idx++];
-    vec4 shape_color = cmd_data[data_idx++];
+    vec4 shape_bounds = get_cmd_data(data_idx++);
+    vec4 shape_color = get_cmd_data(data_idx++);
 
     vec2 clip_clamp = vec2(
       clamp(frag_coord.x, shape_bounds.x, shape_bounds.z),
@@ -133,8 +136,8 @@ void main() {
 
     if (cmd_type == CMD_LINE) {
 
-      vec4 shape_def1 = cmd_data[data_idx++];
-      vec4 shape_def2 = cmd_data[data_idx++];
+      vec4 shape_def1 = get_cmd_data(data_idx++);
+      vec4 shape_def2 = get_cmd_data(data_idx++);
       if (clip_dist > 1.0) continue;
 
       float line_radius = shape_def2[0];
@@ -142,15 +145,15 @@ void main() {
 
     } else if (cmd_type == CMD_TRIANGLE) {
 
-      vec4 shape_def1 = cmd_data[data_idx++];
-      vec4 shape_def2 = cmd_data[data_idx++];
+      vec4 shape_def1 = get_cmd_data(data_idx++);
+      vec4 shape_def2 = get_cmd_data(data_idx++);
       if (clip_dist > 1.0) continue;
 
       shape_dist = dist_to_triangle(frag_coord, vec2(shape_def1.xy), vec2(shape_def1.zw), vec2(shape_def2.xy));
 
     } else if (cmd_type == CMD_RECT) {
 
-      vec4 shape_def = cmd_data[data_idx++];
+      vec4 shape_def = get_cmd_data(data_idx++);
       if (clip_dist > 1.0) continue;
 
       float corner_radius = shape_def[0];
@@ -161,7 +164,7 @@ void main() {
 
     } else if (cmd_type == CMD_FRAME) {
 
-      vec4 shape_def = cmd_data[data_idx++];
+      vec4 shape_def = get_cmd_data(data_idx++);
       if (clip_dist > 1.0) continue;
 
       float line_width = shape_def[0];
@@ -180,7 +183,7 @@ void main() {
 
     } else if (cmd_type == CMD_IMAGE) {
 
-      vec4 shape_def = cmd_data[data_idx++];
+      vec4 shape_def = get_cmd_data(data_idx++);
       if (clip_dist > 1.0) continue;
 
       // Shape is the same as the rectangle with rounded corners.

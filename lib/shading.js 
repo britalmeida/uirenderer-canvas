@@ -41,7 +41,8 @@ export function UIRenderer(canvas, redrawCallback) {
 
   // Rendering context
   this.gl = null;
-  const MAX_CMDS = 4096; // Note: hardcoded on the shader side as well.
+  const MAX_CMD_BUFFER_LINE = 8192; // Note: hardcoded on the shader side as well.
+  const MAX_CMDS = MAX_CMD_BUFFER_LINE * MAX_CMD_BUFFER_LINE;
 
   // Callback to trigger a redraw of the view component using this renderer.
   this.redrawCallback = redrawCallback;
@@ -332,8 +333,16 @@ export function UIRenderer(canvas, redrawCallback) {
     const numCmds = this.cmdDataIdx / 4;
     //console.log(numCmds);
     gl.uniform1i(this.shaderInfo.uniforms.numCmds, numCmds);
-    gl.bindBuffer(gl.UNIFORM_BUFFER, this.buffers.cmdData);
-    gl.bufferSubData(gl.UNIFORM_BUFFER, 0, this.cmdData, 0, this.cmdDataIdx);
+
+    const width = Math.min(numCmds, MAX_CMD_BUFFER_LINE);
+    const height = Math.ceil(numCmds / MAX_CMD_BUFFER_LINE);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.buffers.cmdBufferTexture);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, // Transfer data
+      0, 0, width, height, // x,y offsets, width, height.
+      gl.RGBA, gl.FLOAT, // Source format and type.
+      this.cmdData);
+    gl.uniform1i(this.shaderInfo.uniforms.cmdBufferTex, 0); // Set shader sampler to use TextureUnit X
 
     // Bind the isolated textures.
     for (let i = 0; i < this.shaderInfo.uniforms.samplers.length; i++) {
@@ -399,6 +408,7 @@ export function UIRenderer(canvas, redrawCallback) {
         modelViewProj: bind_uniform(gl, shaderProgram, 'mvp'),
         vpHeight: bind_uniform(gl, shaderProgram, 'viewport_height'),
         numCmds: bind_uniform(gl, shaderProgram, 'num_cmds'),
+        cmdBufferTex: bind_uniform(gl, shaderProgram, 'cmd_data'),
         samplers: [
           bind_uniform(gl, shaderProgram, 'sampler0'),
           bind_uniform(gl, shaderProgram, 'sampler1'),
@@ -414,6 +424,7 @@ export function UIRenderer(canvas, redrawCallback) {
       },
       uniformBlocks: {
         cmdData: gl.getUniformBlockIndex(shaderProgram, "CmdDataBlock"),
+        cmdData1: gl.getUniformBlockIndex(shaderProgram, "CmdDataBlock1"),
       },
     };
 
@@ -450,8 +461,8 @@ export function UIRenderer(canvas, redrawCallback) {
       pos: gl.createBuffer(),
       // Sadly, WebGL2 does not support Buffer Textures (no gl.texBuffer() or gl.TEXTURE_BUFFER target).
       // It doesn't support 1D textures either. We're left with a UBO or a 2D image for command data storage.
-      // As it doesn't support image samplers either, I chose a UBO.
-      cmdData: gl.createBuffer(),
+      // Chose a 2D image because it can support more data than the UBO.
+      cmdBufferTexture: gl.createTexture(),
     };
 
     // Set the vertex positions as a full size rect. Done once, never changes.
@@ -461,12 +472,17 @@ export function UIRenderer(canvas, redrawCallback) {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.pos);
     gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW); // Transfer data to GPU
 
-    const shaderIdx = this.shaderInfo.uniformBlocks.cmdData;
-    gl.bindBuffer(gl.UNIFORM_BUFFER, this.buffers.cmdData);
-    gl.bufferData(gl.UNIFORM_BUFFER, MAX_CMDS * 16, gl.DYNAMIC_DRAW);
-    gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, this.buffers.cmdData);
-    gl.bindBuffer(gl.UNIFORM_BUFFER, null);
-    gl.uniformBlockBinding(shaderProgram, shaderIdx, 0); // Bind only once, it won't change.
+    // Create the texture object to be associated with the commands buffer.
+    gl.bindTexture(gl.TEXTURE_2D, this.buffers.cmdBufferTexture);
+    gl.texStorage2D(gl.TEXTURE_2D, // Allocate immutable storage.
+        1, // Number of mip map levels.
+        gl.RGBA32F, // GPU internal format: 4x 32bit float components.
+        MAX_CMD_BUFFER_LINE, MAX_CMD_BUFFER_LINE); // Width, height.
+    // Disable mip mapping.
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   }
 
   this.init(canvas);
