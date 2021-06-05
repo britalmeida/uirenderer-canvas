@@ -168,7 +168,7 @@ export function UIRenderer(canvas, redrawCallback) {
         console.warn(limitExceededMsg);
         return;
       }
-      if (this.loadingTextureIDs.indexOf(textureID) !== -1) {
+      if (textureID == null || this.loadingTextureIDs.indexOf(textureID) !== -1) {
         // The requested texture is invalid (not created or populated yet). Fallback to the default one.
         const fallbackTexIdx = texturesToDraw.indexOf(fallbackTextureID);
         samplerIdx += (fallbackTexIdx === -1) ? texturesToDraw.push(fallbackTextureID) - 1 : fallbackTexIdx;
