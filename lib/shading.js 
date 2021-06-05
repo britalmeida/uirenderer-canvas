@@ -41,7 +41,7 @@ export function UIRenderer(canvas, redrawCallback) {
 
   // Rendering context
   this.gl = null;
-  const MAX_CMD_BUFFER_LINE = 8192; // Note: hardcoded on the shader side as well.
+  const MAX_CMD_BUFFER_LINE = 1024; // Note: hardcoded on the shader side as well.
   const MAX_CMDS = MAX_CMD_BUFFER_LINE * MAX_CMD_BUFFER_LINE;
 
   // Callback to trigger a redraw of the view component using this renderer.
@@ -51,7 +51,7 @@ export function UIRenderer(canvas, redrawCallback) {
   this.transform = [ 1, 0, 0, 0,
                      0, 1, 0, 0,
                      0, 0, 1, 0,
-                     0, 0, 0, 1];
+                     0, 0, 0, 1 ];
 
   // Shader data
   this.shaderInfo = {};
@@ -168,7 +168,7 @@ export function UIRenderer(canvas, redrawCallback) {
         console.warn(limitExceededMsg);
         return;
       }
-      if (!this.gl.isTexture(textureID) || this.loadingTextureIDs.indexOf(textureID) !== -1) {
+      if (this.loadingTextureIDs.indexOf(textureID) !== -1) {
         // The requested texture is invalid (not created or populated yet). Fallback to the default one.
         const fallbackTexIdx = texturesToDraw.indexOf(fallbackTextureID);
         samplerIdx += (fallbackTexIdx === -1) ? texturesToDraw.push(fallbackTextureID) - 1 : fallbackTexIdx;
@@ -535,7 +535,7 @@ function load_shader(gl, shader_type, source_code) {
 
   const shader = gl.createShader(shader_type);
 
-  console.log("Compiling", (shader_type===gl.VERTEX_SHADER)? "Vertex" : "Fragment", "Shader...");
+  //console.log("Compiling", (shader_type===gl.VERTEX_SHADER)? "Vertex" : "Fragment", "Shader...");
 
   gl.shaderSource(shader, source_code);
   gl.compileShader(shader);

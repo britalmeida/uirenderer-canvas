@@ -35,7 +35,7 @@ float dot2(vec2 v) { return dot(v, v); }
 float dot2(vec3 v) { return dot(v, v); }
 
 vec4 get_cmd_data(int data_idx) {
-  ivec2 tex_coord = ivec2(data_idx % 8192, int(data_idx / 8192));
+  ivec2 tex_coord = ivec2(data_idx % 1024, int(data_idx / 1024));
   return texelFetch(cmd_data, tex_coord, 0);
 }
 
