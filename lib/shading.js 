@@ -41,7 +41,7 @@ export function UIRenderer(canvas, redrawCallback) {
 
   // Rendering context
   this.gl = null;
-  const MAX_CMD_BUFFER_LINE = 1024; // Note: hardcoded on the shader side as well.
+  const MAX_CMD_BUFFER_LINE = 512; // Note: hardcoded on the shader side as well.
   const MAX_CMDS = MAX_CMD_BUFFER_LINE * MAX_CMD_BUFFER_LINE;
 
   // Callback to trigger a redraw of the view component using this renderer.
@@ -70,42 +70,35 @@ export function UIRenderer(canvas, redrawCallback) {
   const CMD_RECT     = 3;
   const CMD_FRAME    = 4;
   const CMD_IMAGE    = 5;
+  const STATE_STYLE  = 10;
+
+  // State
+  this.stateColor = [1, 1, 1, 1];
+  this.stateLineWidth = 1.0;
+  this.stateCorner = 0.0;
+  this.stateChanges = 0;
 
   // Add primitives.
   this.addRect = function (left, top, width, height, color, cornerWidth = 0) {
     const bounds = new Rect(left, top, width, height);
-    let w = this.addPrimitiveShape(CMD_RECT, bounds, color);
-    // Data 3 - Shape parameters
-    this.cmdData[w++] = cornerWidth;
-    w+=3;
-
-    this.cmdDataIdx = w;
+    this.addPrimitiveShape(CMD_RECT, bounds, color, null, cornerWidth);
   }
 
   this.addFrame = function (left, top, width, height, lineWidth, color, cornerWidth = 0) {
     const bounds = new Rect(left, top, width, height);
-    let w = this.addPrimitiveShape(CMD_FRAME, bounds, color);
-    // Data 3 - Shape parameters
-    this.cmdData[w++] = lineWidth;
-    this.cmdData[w++] = cornerWidth;
-    w+=2;
-
-    this.cmdDataIdx = w;
+    this.addPrimitiveShape(CMD_FRAME, bounds, color, lineWidth, cornerWidth);
   }
 
   this.addLine = function (p1, p2, width, color) {
     let bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.encapsulate(p2);
     bounds.widen(Math.round(width * 0.5 + 0.01));
-    let w = this.addPrimitiveShape(CMD_LINE, bounds, color);
+    let w = this.addPrimitiveShape(CMD_LINE, bounds, color, width, null);
     // Data 3 - Shape parameters
     this.cmdData[w++] = p1[0];
     this.cmdData[w++] = p1[1];
     this.cmdData[w++] = p2[0];
     this.cmdData[w++] = p2[1];
-    // Data 4 - Shape parameters II
-    this.cmdData[w++] = width * 0.5;
-    w+=3;
 
     this.cmdDataIdx = w;
   }
@@ -114,7 +107,7 @@ export function UIRenderer(canvas, redrawCallback) {
     let bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.encapsulate(p2);
     bounds.encapsulate(p3);
-    let w = this.addPrimitiveShape(CMD_TRIANGLE, bounds, color);
+    let w = this.addPrimitiveShape(CMD_TRIANGLE, bounds, color, null, null);
     // Data 3 - Shape parameters
     this.cmdData[w++] = p1[0];
     this.cmdData[w++] = p1[1];
@@ -185,24 +178,44 @@ export function UIRenderer(canvas, redrawCallback) {
 
   this.addImageInternal = function (left, top, width, height, samplerIdx, slice, cornerWidth, alpha) {
     const bounds = new Rect(left, top, width, height);
-    let w = this.addPrimitiveShape(CMD_IMAGE, bounds, [1.0, 1.0, 1.0, alpha]);
+    let w = this.addPrimitiveShape(CMD_IMAGE, bounds, [1.0, 1.0, 1.0, alpha], null, cornerWidth);
     // Data 3 - Shape parameters
-    this.cmdData[w++] = cornerWidth;
     this.cmdData[w++] = samplerIdx;
     this.cmdData[w++] = slice;
-    w+=1;
+    w+=2;
 
     this.cmdDataIdx = w;
   }
 
-  this.addPrimitiveShape = function (cmdType, bounds, color) {
+  this.addPrimitiveShape = function (cmdType, bounds, color, lineWidth, corner) {
     let w = this.cmdDataIdx;
-    // Check for at least 5 free command slots as that's the maximum a shape might need.
-    if (w/4 + 5 > MAX_CMDS) {
-      console.warn("Too many shapes to draw.", w/4 + 5, "of", MAX_CMDS);
+    // Check for at least 4 free command slots as that's the maximum a shape might need.
+    if (w/4 + 4 > MAX_CMDS) {
+      console.warn("Too many shapes to draw.", w/4 + 4, "of", MAX_CMDS);
       // Overwrite the start of the command buffer.
       return 0;
     }
+
+    // Check for a change of state and push a state change cmd if needed.
+    if (!this.stateColor.every((v, i) => v === color[i]) // Is color array different?
+        || (lineWidth !== null && this.stateLineWidth !== lineWidth) // Is line width used for this shape and different?
+        || (corner !== null && this.stateCorner !== corner)
+    ) {
+      this.stateColor = color;
+      this.stateLineWidth = lineWidth !== null ? lineWidth : 1.0;
+      this.stateCorner = corner !== null ? corner : 0.0;
+      this.stateChanges++;
+
+      // Data 0 - Header
+      this.cmdData[w++] = STATE_STYLE;
+      this.cmdData[w++] = this.stateLineWidth;
+      this.cmdData[w++] = this.stateCorner;
+      w += 1; // Unused.
+      // Data 1 - Color
+      this.cmdData.set(this.stateColor, w);
+      w += 4;
+    }
+
     // Data 0 - Header
     this.cmdData[w++] = cmdType;
     w += 3;
@@ -211,9 +224,6 @@ export function UIRenderer(canvas, redrawCallback) {
     this.cmdData[w++] = bounds.top;
     this.cmdData[w++] = bounds.right;
     this.cmdData[w++] = bounds.bottom;
-    // Data 2 - Color
-    this.cmdData.set(color, w);
-    w += 4;
     this.cmdDataIdx = w;
 
     return w;
@@ -331,7 +341,7 @@ export function UIRenderer(canvas, redrawCallback) {
 
     // Upload the command buffer to the GPU.
     const numCmds = this.cmdDataIdx / 4;
-    //console.log(numCmds);
+    //console.log(numCmds, "state changes", this.stateChanges);
     gl.uniform1i(this.shaderInfo.uniforms.numCmds, numCmds);
 
     const width = Math.min(numCmds, MAX_CMD_BUFFER_LINE);
@@ -377,6 +387,11 @@ export function UIRenderer(canvas, redrawCallback) {
     this.cmdDataIdx = 0;
     this.textureIDs = [];
     this.textureBundleIDs = [];
+    // Clear the state.
+    this.stateColor = [1, 1, 1, 1];
+    this.stateLineWidth = 1.0;
+    this.stateCorner = 0.0;
+    this.stateChanges = 0;
   }
 
   // Initialize the renderer: compile the shader and setup static data.

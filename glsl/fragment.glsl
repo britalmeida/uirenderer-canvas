@@ -8,6 +8,8 @@ const int CMD_TRIANGLE = 2;
 const int CMD_RECT     = 3;
 const int CMD_FRAME    = 4;
 const int CMD_IMAGE    = 5;
+const int STATE_STYLE  = 10;
+
 
 // Inputs
 uniform float viewport_height;
@@ -35,7 +37,7 @@ float dot2(vec2 v) { return dot(v, v); }
 float dot2(vec3 v) { return dot(v, v); }
 
 vec4 get_cmd_data(int data_idx) {
-  ivec2 tex_coord = ivec2(data_idx % 1024, int(data_idx / 1024));
+  ivec2 tex_coord = ivec2(data_idx % 512, int(data_idx / 512));
   return texelFetch(cmd_data, tex_coord, 0);
 }
 
@@ -110,6 +112,11 @@ void main() {
   vec3 px_color = vec3(0.18, 0.18, 0.18);
   float px_alpha = 1.0;
 
+  // Current state given by commands.
+  vec4 state_color = vec4(0.3, 0.0, 0.3, 1.0);
+  float state_line_width = 1.0;
+  float state_corner_radius = 0.0;
+
   // Process the commands with the procedural shape definitions in order.
   // Check if this pixel is inside (or partially inside) each shape and update its color.
   int data_idx = 0;
@@ -118,8 +125,16 @@ void main() {
     vec4 cmd = get_cmd_data(data_idx++);
     int cmd_type = int(cmd[0]);
 
+    // Process state commands.
+    if (cmd_type == STATE_STYLE) {
+      state_line_width = cmd[1];
+      state_corner_radius = cmd[2];
+      state_color = get_cmd_data(data_idx++);
+      continue;
+    }
+
+    vec4 shape_color = state_color;
     vec4 shape_bounds = get_cmd_data(data_idx++);
-    vec4 shape_color = get_cmd_data(data_idx++);
 
     vec2 clip_clamp = vec2(
       clamp(frag_coord.x, shape_bounds.x, shape_bounds.z),
@@ -137,10 +152,9 @@ void main() {
     if (cmd_type == CMD_LINE) {
 
       vec4 shape_def1 = get_cmd_data(data_idx++);
-      vec4 shape_def2 = get_cmd_data(data_idx++);
       if (clip_dist > 1.0) continue;
 
-      float line_radius = shape_def2[0];
+      float line_radius = state_line_width * 0.5;
       shape_dist = dist_to_line(frag_coord, vec2(shape_def1.xy), vec2(shape_def1.zw), line_radius);
 
     } else if (cmd_type == CMD_TRIANGLE) {
@@ -153,22 +167,19 @@ void main() {
 
     } else if (cmd_type == CMD_RECT) {
 
-      vec4 shape_def = get_cmd_data(data_idx++);
       if (clip_dist > 1.0) continue;
 
-      float corner_radius = shape_def[0];
       // The actual rect is 1px smaller than the bounds, aligned top-left.
       // e.g. for rect defined left=2, right=5 => width=3, pixel coverage= 2,3,4.
       vec4 rect = vec4(shape_bounds.x, shape_bounds.y, shape_bounds.z - 1.0, shape_bounds.w - 1.0);
-      shape_dist = dist_to_round_rect(frag_coord, rect, corner_radius);
+      shape_dist = dist_to_round_rect(frag_coord, rect, state_corner_radius);
 
     } else if (cmd_type == CMD_FRAME) {
 
-      vec4 shape_def = get_cmd_data(data_idx++);
       if (clip_dist > 1.0) continue;
 
-      float line_width = shape_def[0];
-      float corner_radius = shape_def[1];
+      float line_width = state_line_width;
+      float corner_radius = state_corner_radius;
       float inner_corner_radius = max(corner_radius - line_width, 0.0);
       vec4 outter_rect = vec4(shape_bounds.x, shape_bounds.y, shape_bounds.z - 1.0, shape_bounds.w - 1.0);
       vec4 inner_rect = vec4(
@@ -187,19 +198,19 @@ void main() {
       if (clip_dist > 1.0) continue;
 
       // Shape is the same as the rectangle with rounded corners.
-      float corner_radius = shape_def[0];
       vec4 rect = vec4(shape_bounds.x, shape_bounds.y, shape_bounds.z - 1.0, shape_bounds.w - 1.0);
-      shape_dist = dist_to_round_rect(frag_coord, rect, corner_radius);
+      shape_dist = dist_to_round_rect(frag_coord, rect, state_corner_radius);
 
       // Color of each fragment is given by a texture lookup.
       float alpha = shape_color.a;
-      int sampler_idx = int(shape_def[1]);
-      float slice = shape_def[2]; // Used for texture arrays only.
+      int sampler_idx = int(shape_def[0]);
+      float slice = shape_def[1]; // Used for texture arrays only.
       vec2 tex_coord = vec2(
         (frag_coord.x - rect.x) / (rect.z - rect.x),
         (frag_coord.y - rect.y) / (rect.w - rect.y));
       shape_color = sample_texture(sampler_idx, tex_coord, slice);
       shape_color.a *= alpha;
+
     }
 
     float shape_coverage_mask = clamp(1.0 - shape_dist, 0.0, 1.0);
