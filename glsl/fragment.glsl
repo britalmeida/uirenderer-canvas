@@ -221,6 +221,6 @@ void main() {
   // Debug print the command texture
   ivec2 tex_coord = ivec2(frag_coord.x, frag_coord.y);
   vec4 texel = texelFetch(cmd_data, tex_coord, 0);
-  fragColor = vec4(texel.x/10.0, texel.y/10.0, texel.z/10.0, 1.0);
+  fragColor = vec4(texel.x/1.0, texel.y/1.0, texel.z/1.0, 1.0);
   */
 }

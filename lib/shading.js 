@@ -42,7 +42,9 @@ export function UIRenderer(canvas, redrawCallback) {
   // Rendering context
   this.gl = null;
   const MAX_CMD_BUFFER_LINE = 512; // Note: hardcoded on the shader side as well.
-  const MAX_CMDS = MAX_CMD_BUFFER_LINE * MAX_CMD_BUFFER_LINE;
+  const MAX_CMD_DATA = MAX_CMD_BUFFER_LINE * MAX_CMD_BUFFER_LINE;
+  const MAX_STYLE_CMDS = MAX_CMD_BUFFER_LINE;
+  const MAX_SHAPE_CMDS = MAX_CMD_DATA - MAX_STYLE_CMDS;
 
   // Callback to trigger a redraw of the view component using this renderer.
   this.redrawCallback = redrawCallback;
@@ -56,7 +58,7 @@ export function UIRenderer(canvas, redrawCallback) {
   // Shader data
   this.shaderInfo = {};
   this.buffers = {};
-  this.cmdData = new Float32Array(MAX_CMDS * 4); // Pre-allocate commands of 4 floats (128 width).
+  this.cmdData = new Float32Array(MAX_CMD_DATA * 4); // Pre-allocate commands of 4 floats (128 width).
   this.cmdDataIdx = 0;
   this.fallback2DTextureID = null;
   this.fallbackArrayTextureID = null;
@@ -72,7 +74,7 @@ export function UIRenderer(canvas, redrawCallback) {
   const CMD_IMAGE    = 5;
 
   // Style
-  this.styleDataStartIdx = MAX_CMDS * 4 - MAX_CMD_BUFFER_LINE; // Start writing style to the last cmd data texture line.
+  this.styleDataStartIdx = (MAX_CMD_DATA - MAX_STYLE_CMDS) * 4; // Start writing style to the last cmd data texture line.
   this.styleDataIdx = this.styleDataStartIdx;
   this.styleStep = 2 * 4; // Number of floats that a single style needs.
 
@@ -194,8 +196,8 @@ export function UIRenderer(canvas, redrawCallback) {
   this.addPrimitiveShape = function (cmdType, bounds, color, lineWidth, corner) {
     let w = this.cmdDataIdx;
     // Check for at least 4 free command slots as that's the maximum a shape might need.
-    if (w/4 + 4 > MAX_CMDS) {
-      console.warn("Too many shapes to draw.", w/4 + 4, "of", MAX_CMDS);
+    if (w/4 + 4 > MAX_SHAPE_CMDS) {
+      console.warn("Too many shapes to draw.", w/4 + 4, "of", MAX_SHAPE_CMDS);
       // Overwrite the start of the command buffer.
       return 0;
     }
@@ -211,6 +213,13 @@ export function UIRenderer(canvas, redrawCallback) {
       this.stateChanges++;
 
       let sw = this.styleDataIdx;
+      // Check for the required number of style data slots.
+      if ((sw - this.styleDataStartIdx)/4 + 2 > MAX_STYLE_CMDS) {
+        console.warn("Too many different styles to draw.", sw/4 + 2, "of", MAX_STYLE_CMDS);
+        // Overwrite first styles.
+        sw = this.styleDataStartIdx;
+      }
+
       // Data 0 - Header
       this.cmdData[sw++] = this.stateLineWidth;
       this.cmdData[sw++] = this.stateCorner;
