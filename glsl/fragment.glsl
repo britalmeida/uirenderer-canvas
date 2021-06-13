@@ -8,8 +8,6 @@ const int CMD_TRIANGLE = 2;
 const int CMD_RECT     = 3;
 const int CMD_FRAME    = 4;
 const int CMD_IMAGE    = 5;
-const int STATE_STYLE  = 10;
-
 
 // Inputs
 uniform float viewport_height;
@@ -38,6 +36,11 @@ float dot2(vec3 v) { return dot(v, v); }
 
 vec4 get_cmd_data(int data_idx) {
   ivec2 tex_coord = ivec2(data_idx % 512, int(data_idx / 512));
+  return texelFetch(cmd_data, tex_coord, 0);
+}
+
+vec4 get_style_data(int style_idx) {
+  ivec2 tex_coord = ivec2(style_idx % 512, 511);
   return texelFetch(cmd_data, tex_coord, 0);
 }
 
@@ -112,11 +115,6 @@ void main() {
   vec3 px_color = vec3(0.18, 0.18, 0.18);
   float px_alpha = 1.0;
 
-  // Current state given by commands.
-  vec4 state_color = vec4(0.3, 0.0, 0.3, 1.0);
-  float state_line_width = 1.0;
-  float state_corner_radius = 0.0;
-
   // Process the commands with the procedural shape definitions in order.
   // Check if this pixel is inside (or partially inside) each shape and update its color.
   int data_idx = 0;
@@ -124,16 +122,12 @@ void main() {
 
     vec4 cmd = get_cmd_data(data_idx++);
     int cmd_type = int(cmd[0]);
+    int style_idx = int(cmd[1]);
 
-    // Process state commands.
-    if (cmd_type == STATE_STYLE) {
-      state_line_width = cmd[1];
-      state_corner_radius = cmd[2];
-      state_color = get_cmd_data(data_idx++);
-      continue;
-    }
-
-    vec4 shape_color = state_color;
+    vec4 style = get_style_data(style_idx);
+    float line_width = style[0];
+    float corner_radius = style[1];
+    vec4 shape_color = get_style_data(style_idx+1);
     vec4 shape_bounds = get_cmd_data(data_idx++);
 
     vec2 clip_clamp = vec2(
@@ -154,7 +148,7 @@ void main() {
       vec4 shape_def1 = get_cmd_data(data_idx++);
       if (clip_dist > 1.0) continue;
 
-      float line_radius = state_line_width * 0.5;
+      float line_radius = line_width * 0.5;
       shape_dist = dist_to_line(frag_coord, vec2(shape_def1.xy), vec2(shape_def1.zw), line_radius);
 
     } else if (cmd_type == CMD_TRIANGLE) {
@@ -172,14 +166,12 @@ void main() {
       // The actual rect is 1px smaller than the bounds, aligned top-left.
       // e.g. for rect defined left=2, right=5 => width=3, pixel coverage= 2,3,4.
       vec4 rect = vec4(shape_bounds.x, shape_bounds.y, shape_bounds.z - 1.0, shape_bounds.w - 1.0);
-      shape_dist = dist_to_round_rect(frag_coord, rect, state_corner_radius);
+      shape_dist = dist_to_round_rect(frag_coord, rect, corner_radius);
 
     } else if (cmd_type == CMD_FRAME) {
 
       if (clip_dist > 1.0) continue;
 
-      float line_width = state_line_width;
-      float corner_radius = state_corner_radius;
       float inner_corner_radius = max(corner_radius - line_width, 0.0);
       vec4 outter_rect = vec4(shape_bounds.x, shape_bounds.y, shape_bounds.z - 1.0, shape_bounds.w - 1.0);
       vec4 inner_rect = vec4(
@@ -199,7 +191,7 @@ void main() {
 
       // Shape is the same as the rectangle with rounded corners.
       vec4 rect = vec4(shape_bounds.x, shape_bounds.y, shape_bounds.z - 1.0, shape_bounds.w - 1.0);
-      shape_dist = dist_to_round_rect(frag_coord, rect, state_corner_radius);
+      shape_dist = dist_to_round_rect(frag_coord, rect, corner_radius);
 
       // Color of each fragment is given by a texture lookup.
       float alpha = shape_color.a;
@@ -224,4 +216,11 @@ void main() {
   }
 
   fragColor = vec4(px_color, px_alpha);
+
+  /*
+  // Debug print the command texture
+  ivec2 tex_coord = ivec2(frag_coord.x, frag_coord.y);
+  vec4 texel = texelFetch(cmd_data, tex_coord, 0);
+  fragColor = vec4(texel.x/10.0, texel.y/10.0, texel.z/10.0, 1.0);
+  */
 }

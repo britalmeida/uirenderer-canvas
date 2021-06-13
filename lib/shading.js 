@@ -70,10 +70,14 @@ export function UIRenderer(canvas, redrawCallback) {
   const CMD_RECT     = 3;
   const CMD_FRAME    = 4;
   const CMD_IMAGE    = 5;
-  const STATE_STYLE  = 10;
+
+  // Style
+  this.styleDataStartIdx = MAX_CMDS * 4 - MAX_CMD_BUFFER_LINE; // Start writing style to the last cmd data texture line.
+  this.styleDataIdx = this.styleDataStartIdx;
+  this.styleStep = 2 * 4; // Number of floats that a single style needs.
 
   // State
-  this.stateColor = [1, 1, 1, 1];
+  this.stateColor = [-1, -1, -1, -1];
   this.stateLineWidth = 1.0;
   this.stateCorner = 0.0;
   this.stateChanges = 0;
@@ -196,7 +200,7 @@ export function UIRenderer(canvas, redrawCallback) {
       return 0;
     }
 
-    // Check for a change of state and push a state change cmd if needed.
+    // Check for a change of style and push a new style if needed.
     if (!this.stateColor.every((v, i) => v === color[i]) // Is color array different?
         || (lineWidth !== null && this.stateLineWidth !== lineWidth) // Is line width used for this shape and different?
         || (corner !== null && this.stateCorner !== corner)
@@ -206,19 +210,21 @@ export function UIRenderer(canvas, redrawCallback) {
       this.stateCorner = corner !== null ? corner : 0.0;
       this.stateChanges++;
 
+      let sw = this.styleDataIdx;
       // Data 0 - Header
-      this.cmdData[w++] = STATE_STYLE;
-      this.cmdData[w++] = this.stateLineWidth;
-      this.cmdData[w++] = this.stateCorner;
-      w += 1; // Unused.
+      this.cmdData[sw++] = this.stateLineWidth;
+      this.cmdData[sw++] = this.stateCorner;
+      sw += 2; // Unused.
       // Data 1 - Color
-      this.cmdData.set(this.stateColor, w);
-      w += 4;
+      this.cmdData.set(this.stateColor, sw);
+      sw += 4;
+      this.styleDataIdx = sw;
     }
 
     // Data 0 - Header
     this.cmdData[w++] = cmdType;
-    w += 3;
+    this.cmdData[w++] = (this.styleDataIdx - this.styleDataStartIdx - this.styleStep) / 4;
+    w += 2;
     // Data 1 - Bounds
     this.cmdData[w++] = bounds.left;
     this.cmdData[w++] = bounds.top;
@@ -322,6 +328,8 @@ export function UIRenderer(canvas, redrawCallback) {
     // Bind the shader.
     gl.useProgram(this.shaderInfo.program);
 
+    gl.invalidateFramebuffer(gl.FRAMEBUFFER, [gl.COLOR]);
+
     // Set the transform.
     gl.uniformMatrix4fv(this.shaderInfo.uniforms.modelViewProj, false, this.transform);
     gl.uniform1f(this.shaderInfo.uniforms.vpHeight, gl.canvas.height);
@@ -344,14 +352,22 @@ export function UIRenderer(canvas, redrawCallback) {
     //console.log(numCmds, "state changes", this.stateChanges);
     gl.uniform1i(this.shaderInfo.uniforms.numCmds, numCmds);
 
-    const width = Math.min(numCmds, MAX_CMD_BUFFER_LINE);
-    const height = Math.ceil(numCmds / MAX_CMD_BUFFER_LINE);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.buffers.cmdBufferTexture);
+    // Transfer commands.
+    const width = Math.min(numCmds, MAX_CMD_BUFFER_LINE);
+    const height = Math.ceil(numCmds / MAX_CMD_BUFFER_LINE);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, // Transfer data
       0, 0, width, height, // x,y offsets, width, height.
       gl.RGBA, gl.FLOAT, // Source format and type.
       this.cmdData);
+    // Transfer styles.
+    const numStyleData = (this.styleDataIdx - this.styleDataStartIdx) / 4;
+    const styleWidth = Math.min(numStyleData, MAX_CMD_BUFFER_LINE);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0,
+        0, MAX_CMD_BUFFER_LINE - 1, styleWidth, 1, // x,y offsets, width, height.
+        gl.RGBA, gl.FLOAT,
+        this.cmdData, this.styleDataStartIdx);
     gl.uniform1i(this.shaderInfo.uniforms.cmdBufferTex, 0); // Set shader sampler to use TextureUnit X
 
     // Bind the isolated textures.
@@ -388,9 +404,9 @@ export function UIRenderer(canvas, redrawCallback) {
     this.textureIDs = [];
     this.textureBundleIDs = [];
     // Clear the state.
-    this.stateColor = [1, 1, 1, 1];
-    this.stateLineWidth = 1.0;
-    this.stateCorner = 0.0;
+    this.stateColor = [-1, -1, -1, -1];
+    // Clear the style list.
+    this.styleDataIdx = this.styleDataStartIdx;
     this.stateChanges = 0;
   }
 
