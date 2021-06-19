@@ -173,16 +173,16 @@ void main() {
       if (clip_dist > 1.0) continue;
 
       float inner_corner_radius = max(corner_radius - line_width, 0.0);
-      vec4 outter_rect = vec4(shape_bounds.x, shape_bounds.y, shape_bounds.z - 1.0, shape_bounds.w - 1.0);
+      vec4 outer_rect = vec4(shape_bounds.x, shape_bounds.y, shape_bounds.z - 1.0, shape_bounds.w - 1.0);
       vec4 inner_rect = vec4(
         shape_bounds.x + line_width,
         shape_bounds.y + line_width,
         shape_bounds.z - line_width - 1.0,
         shape_bounds.w - line_width - 1.0
       );
-      float dist_to_outter_rect = dist_to_round_rect(frag_coord, outter_rect, corner_radius);
+      float dist_to_outer_rect = dist_to_round_rect(frag_coord, outer_rect, corner_radius);
       float dist_to_inner_rect = dist_to_round_rect(frag_coord, inner_rect, inner_corner_radius);
-      shape_dist = max(dist_to_outter_rect, 1.0 - dist_to_inner_rect);
+      shape_dist = max(dist_to_outer_rect, 1.0 - dist_to_inner_rect);
 
     } else if (cmd_type == CMD_IMAGE) {
 
