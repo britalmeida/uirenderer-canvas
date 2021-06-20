@@ -8,9 +8,11 @@ const int CMD_TRIANGLE = 2;
 const int CMD_RECT     = 3;
 const int CMD_FRAME    = 4;
 const int CMD_IMAGE    = 5;
+const int CMD_CLIP     = 9;
+
 
 // Inputs
-uniform float viewport_height;
+uniform vec2 viewport_size;
 uniform int num_cmds;
 uniform sampler2D cmd_data;
 
@@ -107,13 +109,15 @@ void main() {
   // OpenGL provides the fragment coordinate in pixels where (0,0) is bottom-left.
   // Because the renderer and client UI code has (0,0) top-left, flip the y.
   // Use pixel top-left coordinates instead of center. (0.5, 0.5) -> (0.0, 0.0)
-  vec2 frag_coord = vec2(gl_FragCoord.x, viewport_height - gl_FragCoord.y);
+  vec2 frag_coord = vec2(gl_FragCoord.x, viewport_size.y - gl_FragCoord.y);
   frag_coord -= 0.5;
 
   // Default fragment background color and opacity.
   // Will be overwritten if this pixel is determined to be inside shapes.
   vec3 px_color = vec3(0.18, 0.18, 0.18);
   float px_alpha = 1.0;
+
+  vec4 view_clip_rect = vec4(0, 0, viewport_size.x, viewport_size.y);
 
   // Process the commands with the procedural shape definitions in order.
   // Check if this pixel is inside (or partially inside) each shape and update its color.
@@ -124,15 +128,28 @@ void main() {
     int cmd_type = int(cmd[0]);
     int style_idx = int(cmd[1]);
 
+    if (cmd_type == CMD_CLIP) {
+      view_clip_rect = get_cmd_data(data_idx++);
+      continue;
+    }
+
     vec4 style = get_style_data(style_idx);
     float line_width = style[0];
     float corner_radius = style[1];
     vec4 shape_color = get_style_data(style_idx+1);
     vec4 shape_bounds = get_cmd_data(data_idx++);
 
+    // Get the intersection of the shape bounds and the clip rect.
+    vec4 clip_rect = vec4(
+      max(shape_bounds.x, view_clip_rect.x),
+      max(shape_bounds.y, view_clip_rect.y),
+      min(shape_bounds.z, view_clip_rect.z),
+      min(shape_bounds.w, view_clip_rect.w)
+    );
+    // Check if this pixel is within the area where it may draw.
     vec2 clip_clamp = vec2(
-      clamp(frag_coord.x, shape_bounds.x, shape_bounds.z),
-      clamp(frag_coord.y, shape_bounds.y, shape_bounds.w));
+      clamp(frag_coord.x, clip_rect.x, clip_rect.z),
+      clamp(frag_coord.y, clip_rect.y, clip_rect.w));
     // clip_dist: 0 = not clipped,
     //            ]0,1[ sub-pixel clipping (shape is not aligned pixel perfect)
     //            [1,...[ clipped

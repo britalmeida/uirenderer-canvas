@@ -37,6 +37,47 @@ export function Rect (x, y, w, h) {
 }
 
 
+export function View (x, y, w, h, scale, offset) {
+  this.left = x;
+  this.right = x + w;
+  this.top = y;
+  this.bottom = y + h;
+  this.width = w;
+  this.height = h;
+  this.scaleX = scale[0];
+  this.scaleY = scale[1];
+  this.offsetX = offset[0];
+  this.offsetY = offset[1];
+
+  this.transformPosX = function(p) {
+    return (p - this.left - this.offsetX) * this.scaleX + this.left;
+  }
+
+  this.transformPosY = function(p) {
+    return (p - this.top - this.offsetY) * this.scaleY + this.top;
+  }
+
+  this.transformDistX = function(d) {
+    return d * this.scaleX;
+  }
+
+  this.transformDistY = function(d) {
+    return d * this.scaleY;
+  }
+
+  this.transformRect = function(r) {
+    return new Rect(
+      this.transformPosX(r.left),
+      this.transformPosY(r.top),
+      this.transformDistX(r.width),
+      this.transformDistY(r.height));
+  }
+  this.getXYScale = function() {
+    return Math.min(this.scaleX, this.scaleY);
+  }
+}
+
+
 export function UIRenderer(canvas, redrawCallback) {
 
   // Rendering context
@@ -50,10 +91,7 @@ export function UIRenderer(canvas, redrawCallback) {
   this.redrawCallback = redrawCallback;
 
   // Viewport transform
-  this.transform = [ 1, 0, 0, 0,
-                     0, 1, 0, 0,
-                     0, 0, 1, 0,
-                     0, 0, 0, 1 ];
+  this.views = [];
 
   // Shader data
   this.shaderInfo = {};
@@ -72,6 +110,7 @@ export function UIRenderer(canvas, redrawCallback) {
   const CMD_RECT     = 3;
   const CMD_FRAME    = 4;
   const CMD_IMAGE    = 5;
+  const CMD_CLIP     = 9;
 
   // Style
   this.styleDataStartIdx = (MAX_CMD_DATA - MAX_STYLE_CMDS) * 4; // Start writing style to the last cmd data texture line.
@@ -99,32 +138,38 @@ export function UIRenderer(canvas, redrawCallback) {
     let bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.encapsulate(p2);
     bounds.widen(Math.round(width * 0.5 + 0.01));
-    let w = this.addPrimitiveShape(CMD_LINE, bounds, color, width, null);
-    // Data 3 - Shape parameters
-    this.cmdData[w++] = p1[0];
-    this.cmdData[w++] = p1[1];
-    this.cmdData[w++] = p2[0];
-    this.cmdData[w++] = p2[1];
+    if (this.addPrimitiveShape(CMD_LINE, bounds, color, width, null)) {
+      let w = this.cmdDataIdx;
+      const v = this.getView();
+      // Data 3 - Shape parameters
+      this.cmdData[w++] = v ? v.transformPosX(p1[0]) : p1[0];
+      this.cmdData[w++] = v ? v.transformPosY(p1[1]) : p1[1];
+      this.cmdData[w++] = v ? v.transformPosX(p2[0]) : p2[0];
+      this.cmdData[w++] = v ? v.transformPosY(p2[1]) : p2[1];
 
-    this.cmdDataIdx = w;
+      this.cmdDataIdx = w;
+    }
   }
 
   this.addTriangle = function (p1, p2, p3, color) {
     let bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.encapsulate(p2);
     bounds.encapsulate(p3);
-    let w = this.addPrimitiveShape(CMD_TRIANGLE, bounds, color, null, null);
-    // Data 3 - Shape parameters
-    this.cmdData[w++] = p1[0];
-    this.cmdData[w++] = p1[1];
-    this.cmdData[w++] = p2[0];
-    this.cmdData[w++] = p2[1];
-    // Data 4 - Shape parameters II
-    this.cmdData[w++] = p3[0];
-    this.cmdData[w++] = p3[1];
-    w+=2;
+    if (this.addPrimitiveShape(CMD_TRIANGLE, bounds, color, null, null)) {
+      let w = this.cmdDataIdx;
+      const v = this.getView();
+      // Data 3 - Shape parameters
+      this.cmdData[w++] = v ? v.transformPosX(p1[0]) : p1[0];
+      this.cmdData[w++] = v ? v.transformPosY(p1[1]) : p1[1];
+      this.cmdData[w++] = v ? v.transformPosX(p2[0]) : p2[0];
+      this.cmdData[w++] = v ? v.transformPosY(p2[1]) : p2[1];
+      // Data 4 - Shape parameters II
+      this.cmdData[w++] = v ? v.transformPosX(p3[0]) : p3[0];
+      this.cmdData[w++] = v ? v.transformPosY(p3[1]) : p3[1];
+      w += 2;
 
-    this.cmdDataIdx = w;
+      this.cmdDataIdx = w;
+    }
   }
 
   this.addCircle = function (p1, radius, color) {
@@ -194,16 +239,29 @@ export function UIRenderer(canvas, redrawCallback) {
   }
 
   this.addPrimitiveShape = function (cmdType, bounds, color, lineWidth, corner) {
+
+    const v = this.getView();
+    bounds = v ? v.transformRect(bounds) : bounds;
+
+    // Clip bounds.
+    if (v &&
+      (bounds.right < v.left || bounds.left > v.right
+      || bounds.bottom < v.top || bounds.top > v.bottom)) {
+      return false;
+    }
+
+    corner = v ? corner * v.getXYScale() : corner;
+    lineWidth = v ? lineWidth * v.getXYScale() : lineWidth;
+
     let w = this.cmdDataIdx;
     // Check for at least 4 free command slots as that's the maximum a shape might need.
     if (w/4 + 4 > MAX_SHAPE_CMDS) {
       console.warn("Too many shapes to draw.", w/4 + 4, "of", MAX_SHAPE_CMDS);
-      // Overwrite the start of the command buffer.
-      return 0;
+      return false;
     }
 
     // Check for a change of style and push a new style if needed.
-    if (!this.stateColor.every((v, i) => v === color[i]) // Is color array different?
+    if (!this.stateColor.every((c, i) => c === color[i]) // Is color array different?
         || (lineWidth !== null && this.stateLineWidth !== lineWidth) // Is line width used for this shape and different?
         || (corner !== null && this.stateCorner !== corner)
     ) {
@@ -242,6 +300,20 @@ export function UIRenderer(canvas, redrawCallback) {
     this.cmdDataIdx = w;
 
     return w;
+  }
+
+  this.addClipRect = function (left, top, right, bottom) {
+    // Write clip rect information for the shader.
+    let w = this.cmdDataIdx;
+    // Data 0 - Header
+    this.cmdData[w++] = CMD_CLIP;
+    w += 3;
+    // Data 1 - Bounds
+    this.cmdData[w++] = left;
+    this.cmdData[w++] = top;
+    this.cmdData[w++] = right;
+    this.cmdData[w++] = bottom;
+    this.cmdDataIdx = w;
   }
 
   // Create a GPU texture object (returns the ID, usable immediately) and
@@ -327,6 +399,24 @@ export function UIRenderer(canvas, redrawCallback) {
     return textureID;
   }
 
+  this.getView = function() {
+    return this.views.length ? this.views[this.views.length - 1] : null;
+  }
+
+  this.pushView = function(x, y, w, h, scale, offset) {
+    const view = new View(x, y, w, h, scale, offset);
+    this.views.push(view);
+    this.addClipRect(x +1, y +1, x + w -1, y + h -1);
+    return view;
+  }
+
+  this.popView = function() {
+    this.views.pop();
+    const v = this.getView();
+    if (v) { this.addClipRect(v.left, v.top, v.right, v.bottom); }
+    else { this.addClipRect(0, 0, this.gl.canvas.width, this.gl.canvas.height); }
+  }
+
   // Draw a frame with the current primitive commands.
   this.draw = function() {
     const gl = this.gl;
@@ -340,8 +430,7 @@ export function UIRenderer(canvas, redrawCallback) {
     gl.invalidateFramebuffer(gl.FRAMEBUFFER, [gl.COLOR]);
 
     // Set the transform.
-    gl.uniformMatrix4fv(this.shaderInfo.uniforms.modelViewProj, false, this.transform);
-    gl.uniform1f(this.shaderInfo.uniforms.vpHeight, gl.canvas.height);
+    gl.uniform2f(this.shaderInfo.uniforms.vpSize, gl.canvas.width, gl.canvas.height);
 
     // Bind the vertex data for the shader to use and specify how to interpret it.
     // The shader works as a full size rect, new coordinates don't need to be set per frame.
@@ -413,6 +502,7 @@ export function UIRenderer(canvas, redrawCallback) {
     this.textureIDs = [];
     this.textureBundleIDs = [];
     // Clear the state.
+    this.views = [];
     this.stateColor = [-1, -1, -1, -1];
     // Clear the style list.
     this.styleDataIdx = this.styleDataStartIdx;
@@ -445,8 +535,7 @@ export function UIRenderer(canvas, redrawCallback) {
         vertexPos: bind_attr(gl, shaderProgram, 'v_pos'),
       },
       uniforms: {
-        modelViewProj: bind_uniform(gl, shaderProgram, 'mvp'),
-        vpHeight: bind_uniform(gl, shaderProgram, 'viewport_height'),
+        vpSize: bind_uniform(gl, shaderProgram, 'viewport_size'),
         numCmds: bind_uniform(gl, shaderProgram, 'num_cmds'),
         cmdBufferTex: bind_uniform(gl, shaderProgram, 'cmd_data'),
         samplers: [
