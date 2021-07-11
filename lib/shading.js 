@@ -316,6 +316,8 @@ export function UIRenderer(canvas, redrawCallback) {
     this.cmdDataIdx = w;
   }
 
+  // Image loading from an URL to a GPU texture.
+
   // Create a GPU texture object (returns the ID, usable immediately) and
   // asynchronously load the image data from the given url onto it.
   this.loadImage = function (url) {
@@ -334,7 +336,7 @@ export function UIRenderer(canvas, redrawCallback) {
     image.onload = function() {
       gl.bindTexture(gl.TEXTURE_2D, textureID);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, // Mipmap level, internal format.
-          gl.RGBA, gl.UNSIGNED_BYTE, image); // Source format and type.
+        gl.RGBA, gl.UNSIGNED_BYTE, image); // Source format and type.
 
       gl.generateMipmap(gl.TEXTURE_2D);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
@@ -382,9 +384,9 @@ export function UIRenderer(canvas, redrawCallback) {
       image.onload = function () {
         gl.bindTexture(gl.TEXTURE_2D_ARRAY, textureID);
         gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0,
-            0, 0, i, // 0 xy offset, start writing at slide i.
-            resolution[0], resolution[1], 1, // 1 full-size slice.
-            gl.RGBA, gl.UNSIGNED_BYTE, image);
+          0, 0, i, // 0 xy offset, start writing at slide i.
+          resolution[0], resolution[1], 1, // 1 full-size slice.
+          gl.RGBA, gl.UNSIGNED_BYTE, image);
 
         // Trigger a redraw of the component view that uses this renderer.
         loadedSlices++;
@@ -398,6 +400,8 @@ export function UIRenderer(canvas, redrawCallback) {
 
     return textureID;
   }
+
+  // Views
 
   this.getView = function() {
     return this.views.length ? this.views[this.views.length - 1] : null;
@@ -437,12 +441,12 @@ export function UIRenderer(canvas, redrawCallback) {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.pos);
     gl.enableVertexAttribArray(this.shaderInfo.attrs.vertexPos);
     gl.vertexAttribPointer(
-        this.shaderInfo.attrs.vertexPos, // Shader attribute index
-        2,         // Number of elements per vertex
-        gl.FLOAT,  // Data type of each element
-        false,     // Normalized?
-        0,         // Stride if data is interleaved
-        0          // Pointer offset to start of data
+      this.shaderInfo.attrs.vertexPos, // Shader attribute index
+      2,         // Number of elements per vertex
+      gl.FLOAT,  // Data type of each element
+      false,     // Normalized?
+      0,         // Stride if data is interleaved
+      0          // Pointer offset to start of data
     );
 
     // Upload the command buffer to the GPU.
@@ -463,9 +467,9 @@ export function UIRenderer(canvas, redrawCallback) {
     const numStyleData = (this.styleDataIdx - this.styleDataStartIdx) / 4;
     const styleWidth = Math.min(numStyleData, MAX_CMD_BUFFER_LINE);
     gl.texSubImage2D(gl.TEXTURE_2D, 0,
-        0, MAX_CMD_BUFFER_LINE - 1, styleWidth, 1, // x,y offsets, width, height.
-        gl.RGBA, gl.FLOAT,
-        this.cmdData, this.styleDataStartIdx);
+      0, MAX_CMD_BUFFER_LINE - 1, styleWidth, 1, // x,y offsets, width, height.
+      gl.RGBA, gl.FLOAT,
+      this.cmdData, this.styleDataStartIdx);
     gl.uniform1i(this.shaderInfo.uniforms.cmdBufferTex, 0); // Set shader sampler to use TextureUnit X
 
     // Bind the isolated textures.
@@ -487,8 +491,8 @@ export function UIRenderer(canvas, redrawCallback) {
 
     // Draw
     gl.drawArrays(gl.TRIANGLE_STRIP,
-        0, // Offset.
-        4  // Vertex count.
+      0, // Offset.
+      4  // Vertex count.
     );
 
     // Unbind the buffers and the shader.
@@ -580,9 +584,9 @@ export function UIRenderer(canvas, redrawCallback) {
       gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8,
         1, 1, 1); // Width, height, slices.
       gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0,
-          0, 0, 0, // x,y,slice offsets.
-          1, 1, 1, // width, height, number of slices to write.
-          gl.RGBA, gl.UNSIGNED_BYTE, pixel_data);
+        0, 0, 0, // x,y,slice offsets.
+        1, 1, 1, // width, height, number of slices to write.
+        gl.RGBA, gl.UNSIGNED_BYTE, pixel_data);
     }
 
     // Generate GPU buffer IDs that will be filled with data later for the shader to use.
@@ -604,9 +608,9 @@ export function UIRenderer(canvas, redrawCallback) {
     // Create the texture object to be associated with the commands buffer.
     gl.bindTexture(gl.TEXTURE_2D, this.buffers.cmdBufferTexture);
     gl.texStorage2D(gl.TEXTURE_2D, // Allocate immutable storage.
-        1, // Number of mip map levels.
-        gl.RGBA32F, // GPU internal format: 4x 32bit float components.
-        MAX_CMD_BUFFER_LINE, MAX_CMD_BUFFER_LINE); // Width, height.
+      1, // Number of mip map levels.
+      gl.RGBA32F, // GPU internal format: 4x 32bit float components.
+      MAX_CMD_BUFFER_LINE, MAX_CMD_BUFFER_LINE); // Width, height.
     // Disable mip mapping.
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
@@ -619,7 +623,7 @@ export function UIRenderer(canvas, redrawCallback) {
 
 
 // Get the shader location of an attribute of a shader by name.
-export function bind_attr(gl, program, attr_name) {
+function bind_attr(gl, program, attr_name) {
   const attr_idx = gl.getAttribLocation(program, attr_name);
   if (attr_idx === -1)
     console.error("Can not bind attribute '", attr_name, "' for shader.");
@@ -628,7 +632,7 @@ export function bind_attr(gl, program, attr_name) {
 
 
 // Get the shader location of an uniform of a shader by name.
-export function bind_uniform(gl, program, attr_name) {
+function bind_uniform(gl, program, attr_name) {
   const loc = gl.getUniformLocation(program, attr_name);
   if (loc === null)
     console.error("Can not bind uniform '", attr_name, "' for shader.");
@@ -637,7 +641,7 @@ export function bind_uniform(gl, program, attr_name) {
 
 
 // Initialize a shader program with th given vertex and fragment shader source code.
-export function init_shader_program(gl, vs_source, fs_source) {
+function init_shader_program(gl, vs_source, fs_source) {
 
   const vs = load_shader(gl, gl.VERTEX_SHADER, vs_source);
   const fs = load_shader(gl, gl.FRAGMENT_SHADER, fs_source);
