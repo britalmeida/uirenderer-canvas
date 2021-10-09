@@ -79,19 +79,23 @@ export function View (x, y, w, h, scale, offset) {
 
 
 export function UIRenderer(canvas, redrawCallback) {
-
   // Rendering context
   this.gl = null;
-  const MAX_CMD_BUFFER_LINE = 512; // Note: hardcoded on the shader side as well.
+  const MAX_CMD_BUFFER_LINE = 512; // Note: constants are hardcoded on the shader side as well.
   const MAX_CMD_DATA = MAX_CMD_BUFFER_LINE * MAX_CMD_BUFFER_LINE;
   const MAX_STYLE_CMDS = MAX_CMD_BUFFER_LINE;
   const MAX_SHAPE_CMDS = MAX_CMD_DATA - MAX_STYLE_CMDS;
+  const TILE_SIZE = 5; // Tile side: 32 pixels = 5 bits.
+  const MAX_TILES = 4 * 1024 - 1; // Must fit in the tileCmdRanges texture. +1 to fit the end index of the last tile
+  const MAX_CMDS_PER_TILE = 64;
+  const TILE_CMDS_BUFFER_LINE = 128;
 
   // Callback to trigger a redraw of the view component using this renderer.
   this.redrawCallback = redrawCallback;
 
   // Viewport transform
   this.views = [];
+  this.viewport = {width: 1, height: 1};
 
   // Shader data
   this.shaderInfo = {};
@@ -103,6 +107,12 @@ export function UIRenderer(canvas, redrawCallback) {
   this.textureIDs = [];
   this.textureBundleIDs = [];
   this.loadingTextureIDs = [];
+  // Tiles
+  this.num_tiles_x = 1;
+  this.num_tiles_y = 1;
+  this.cmdsPerTile = new Array(MAX_TILES); // Unpacked list of commands, indexed by tile. Used when adding shapes.
+  this.tileCmds = new Uint16Array(TILE_CMDS_BUFFER_LINE * TILE_CMDS_BUFFER_LINE); // Packed list of commands.
+  this.tileCmdRanges = new Uint16Array(MAX_TILES + 1); // Where each tile's data is in tileCmds. List of start indexes.
 
   // Command types
   const CMD_LINE     = 1;
@@ -241,18 +251,16 @@ export function UIRenderer(canvas, redrawCallback) {
   this.addPrimitiveShape = function (cmdType, bounds, color, lineWidth, corner) {
 
     const v = this.getView();
-    bounds = v ? v.transformRect(bounds) : bounds;
+    const view_scale = v.getXYScale();
+    bounds = v.transformRect(bounds);
 
     // Clip bounds.
-    if (v &&
-      (bounds.right < v.left || bounds.left > v.right
-      || bounds.bottom < v.top || bounds.top > v.bottom)) {
+    if (bounds.right < v.left || bounds.left > v.right
+      || bounds.bottom < v.top || bounds.top > v.bottom) {
       return false;
     }
 
-    corner = v ? corner * v.getXYScale() : corner;
-    lineWidth = v ? lineWidth * v.getXYScale() : lineWidth;
-
+    // Get the w(rite) index for the global command buffer.
     let w = this.cmdDataIdx;
     // Check for at least 4 free command slots as that's the maximum a shape might need.
     if (w/4 + 4 > MAX_SHAPE_CMDS) {
@@ -260,7 +268,31 @@ export function UIRenderer(canvas, redrawCallback) {
       return false;
     }
 
+    // Add the command index to the command list of all the tiles that might draw it.
+    {
+      // Get the shape´s bounds in tile index space.
+      const shape_tile_start_y = Math.max(bounds.top >> TILE_SIZE, 0);
+      const shape_tile_start_x = Math.max(bounds.left >> TILE_SIZE, 0);
+      const shape_tile_end_x = Math.min(bounds.right >> TILE_SIZE, this.num_tiles_x - 1);
+      const shape_tile_end_y = Math.min(bounds.bottom >> TILE_SIZE, this.num_tiles_y - 1);
+      //console.log(cmdType, w/4, "bounds l,r,t,b:", bounds.left, bounds.right, bounds.top, bounds.bottom,
+      //    "tiles l,r,t,b:", shape_tile_start_x, shape_tile_end_x, shape_tile_start_y, shape_tile_end_y)
+
+      for (let y = shape_tile_start_y; y <= shape_tile_end_y; y++) {
+        for (let x = shape_tile_start_x; x <= shape_tile_end_x; x++) {
+          const tile_idx = y * this.num_tiles_x + x;
+          const num_tile_cmds = ++this.cmdsPerTile[tile_idx][0];
+          if (num_tile_cmds > MAX_CMDS_PER_TILE - 2) {
+            console.warn("Too many shapes in a single tile");
+          }
+          this.cmdsPerTile[tile_idx][num_tile_cmds] = w / 4;
+        }
+      }
+    }
+
     // Check for a change of style and push a new style if needed.
+    corner = corner * view_scale;
+    lineWidth = lineWidth * view_scale;
     if (!this.stateColor.every((c, i) => c === color[i]) // Is color array different?
         || (lineWidth !== null && this.stateLineWidth !== lineWidth) // Is line width used for this shape and different?
         || (corner !== null && this.stateCorner !== corner)
@@ -304,7 +336,27 @@ export function UIRenderer(canvas, redrawCallback) {
 
   this.addClipRect = function (left, top, right, bottom) {
     // Write clip rect information for the shader.
+
+    // Get the w(rite) index for the global command buffer.
     let w = this.cmdDataIdx;
+    // Check for the required number of free command slots.
+    if (w/4 + 2 > MAX_SHAPE_CMDS) {
+      console.warn("Too many shapes to draw.", w/4 + 2, "of", MAX_SHAPE_CMDS);
+      return false;
+    }
+
+    // Add the command index to all the tiles. Tiles outside the clip rect bounds also need it.
+    for (let y = 0; y < this.num_tiles_y; y++) {
+      for (let x = 0; x < this.num_tiles_x; x++) {
+        const tile_idx = y * this.num_tiles_x + x;
+        const num_tile_cmds = ++this.cmdsPerTile[tile_idx][0];
+        if (num_tile_cmds > MAX_CMDS_PER_TILE - 2) {
+          console.log("Too many shapes in a single tile");
+        }
+        this.cmdsPerTile[tile_idx][num_tile_cmds] = w / 4;
+      }
+    }
+
     // Data 0 - Header
     this.cmdData[w++] = CMD_CLIP;
     w += 3;
@@ -418,7 +470,35 @@ export function UIRenderer(canvas, redrawCallback) {
     this.views.pop();
     const v = this.getView();
     if (v) { this.addClipRect(v.left, v.top, v.right, v.bottom); }
-    else { this.addClipRect(0, 0, this.gl.canvas.width, this.gl.canvas.height); }
+    else { this.addClipRect(0, 0, this.viewport.width, this.viewport.height); }
+  }
+
+  // Initialize the state for a new frame
+  this.beginFrame = function() {
+    // Cache the viewport size and number of tiles for this frame.
+    this.viewport.width = this.gl.canvas.width;
+    this.viewport.height = this.gl.canvas.height;
+
+    this.num_tiles_x = (this.viewport.width >> TILE_SIZE) + 1;
+    this.num_tiles_y = (this.viewport.height >> TILE_SIZE) + 1;
+    this.num_tiles_n = this.num_tiles_x * this.num_tiles_y;
+    if (this.num_tiles_n > MAX_TILES) {
+      console.warn("Too many tiles: ",
+          this.num_tiles_n, "(", this.num_tiles_x, "x", this.num_tiles_y, "). Max is", MAX_TILES);
+    }
+    //console.log("vp", this.viewport.width, "x" ,this.viewport.height, "px. tiles", this.num_tiles_x, "x", this.num_tiles_y, "=", this.num_tiles_n);
+
+    // Clear the command ranges for each tile that will be used this frame.
+    for (let i = 0; i < this.num_tiles_n + 1; i++) {
+      this.tileCmdRanges[i] = 0;
+    }
+    // Clear the commands and allocate space for each tile that will be used this frame.
+    for (let i = 0; i < this.num_tiles_n; i++) {
+      this.cmdsPerTile[i] = new Uint16Array(MAX_CMDS_PER_TILE);
+    }
+
+    // Push a fallback full-canvas view with no scale and no offset.
+    this.pushView(0, 0, this.viewport.width, this.viewport.height, [1, 1], [0, 0]);
   }
 
   // Draw a frame with the current primitive commands.
@@ -426,7 +506,7 @@ export function UIRenderer(canvas, redrawCallback) {
     const gl = this.gl;
 
     // Set this view to occupy the full canvas.
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+    gl.viewport(0, 0, this.viewport.width, this.viewport.height);
 
     // Bind the shader.
     gl.useProgram(this.shaderInfo.program);
@@ -434,7 +514,7 @@ export function UIRenderer(canvas, redrawCallback) {
     gl.invalidateFramebuffer(gl.FRAMEBUFFER, [gl.COLOR]);
 
     // Set the transform.
-    gl.uniform2f(this.shaderInfo.uniforms.vpSize, gl.canvas.width, gl.canvas.height);
+    gl.uniform2f(this.shaderInfo.uniforms.vpSize, this.viewport.width, this.viewport.height);
 
     // Bind the vertex data for the shader to use and specify how to interpret it.
     // The shader works as a full size rect, new coordinates don't need to be set per frame.
@@ -449,44 +529,79 @@ export function UIRenderer(canvas, redrawCallback) {
       0          // Pointer offset to start of data
     );
 
-    // Upload the command buffer to the GPU.
-    const numCmds = this.cmdDataIdx / 4;
-    //console.log(numCmds, "state changes", this.stateChanges);
-    gl.uniform1i(this.shaderInfo.uniforms.numCmds, numCmds);
+    // Transfer texture data and bind to the shader samplers.
+    // Note: sampler indexes are hardcoded in the shader's sample_texture().
+    let textureUnit = 0;
 
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.buffers.cmdBufferTexture);
-    // Transfer commands.
-    const width = Math.min(numCmds, MAX_CMD_BUFFER_LINE);
-    const height = Math.ceil(numCmds / MAX_CMD_BUFFER_LINE);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, // Transfer data
-      0, 0, width, height, // x,y offsets, width, height.
-      gl.RGBA, gl.FLOAT, // Source format and type.
-      this.cmdData);
-    // Transfer styles.
-    const numStyleData = (this.styleDataIdx - this.styleDataStartIdx) / 4;
-    const styleWidth = Math.min(numStyleData, MAX_CMD_BUFFER_LINE);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0,
-      0, MAX_CMD_BUFFER_LINE - 1, styleWidth, 1, // x,y offsets, width, height.
-      gl.RGBA, gl.FLOAT,
-      this.cmdData, this.styleDataStartIdx);
-    gl.uniform1i(this.shaderInfo.uniforms.cmdBufferTex, 0); // Set shader sampler to use TextureUnit X
+    // Upload the command buffers to the GPU.
+    {
+      const numCmds = this.cmdDataIdx / 4;
+      //console.log(numCmds, "commands, state changes:", this.stateChanges);
+
+      gl.activeTexture(gl.TEXTURE0 + textureUnit);
+      gl.bindTexture(gl.TEXTURE_2D, this.buffers.cmdBufferTexture);
+      // Transfer commands.
+      let width = Math.min(numCmds, MAX_CMD_BUFFER_LINE);
+      let height = Math.ceil(numCmds / MAX_CMD_BUFFER_LINE);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, // Transfer data
+          0, 0, width, height, // x,y offsets, width, height.
+          gl.RGBA, gl.FLOAT, // Source format and type.
+          this.cmdData);
+      // Transfer styles.
+      const numStyleData = (this.styleDataIdx - this.styleDataStartIdx) / 4;
+      const styleWidth = Math.min(numStyleData, MAX_CMD_BUFFER_LINE);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0,
+          0, MAX_CMD_BUFFER_LINE - 1, styleWidth, 1, // x,y offsets, width, height.
+          gl.RGBA, gl.FLOAT,
+          this.cmdData, this.styleDataStartIdx);
+      gl.uniform1i(this.shaderInfo.uniforms.cmdBufferTex, textureUnit++); // Set shader sampler to use TextureUnit X
+
+      // Pack the commands per tile.
+      // Flatten each tile command list into a single array. Store the start of each tile command list in tileCmdRanges.
+      let tileCmdIdx = 0;
+      for (let ti = 0; ti < this.num_tiles_n; ti++) {
+        this.tileCmdRanges[ti] = tileCmdIdx;
+        for (let i = 0; i < this.cmdsPerTile[ti][0]; i++) {
+          this.tileCmds[tileCmdIdx++] = this.cmdsPerTile[ti][i + 1];
+        }
+      }
+      this.tileCmdRanges[this.num_tiles_n] = tileCmdIdx;
+
+      // Transfer commands per tile
+      gl.activeTexture(gl.TEXTURE0 + textureUnit);
+      gl.bindTexture(gl.TEXTURE_2D, this.buffers.tileCmdsTexture);
+      width = Math.min(tileCmdIdx, TILE_CMDS_BUFFER_LINE);
+      height = Math.ceil(tileCmdIdx / TILE_CMDS_BUFFER_LINE);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0,
+          0, 0, width, height, // x,y offsets, width, height.
+          gl.RED_INTEGER, gl.UNSIGNED_SHORT,
+          this.tileCmds);
+      gl.uniform1i(this.shaderInfo.uniforms.tileCmdsBufferTex, textureUnit++);
+
+      width = Math.min(this.num_tiles_n, MAX_TILES) + 1;
+      gl.activeTexture(gl.TEXTURE0 + textureUnit);
+      gl.bindTexture(gl.TEXTURE_2D, this.buffers.tileCmdRangesTexture);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0,
+          0, 0, width, 1, // x,y offsets, width, height.
+          gl.RED_INTEGER, gl.UNSIGNED_SHORT,
+          this.tileCmdRanges);
+      gl.uniform1i(this.shaderInfo.uniforms.tileCmdRangesBufferTex, textureUnit++);
+    }
 
     // Bind the isolated textures.
+    textureUnit = 5;
     for (let i = 0; i < this.shaderInfo.uniforms.samplers.length; i++) {
-      const textureUnit = 1 + i; // Note: leave unit 0 for random operations.
       const textureID = i < this.textureIDs.length ? this.textureIDs[i] : this.fallback2DTextureID;
       gl.activeTexture(gl.TEXTURE0 + textureUnit); // Set context to use TextureUnit X
       gl.bindTexture(gl.TEXTURE_2D, textureID); // Bind the texture to the active TextureUnit
-      gl.uniform1i(this.shaderInfo.uniforms.samplers[i], textureUnit); // Set shader sampler to use TextureUnit X
+      gl.uniform1i(this.shaderInfo.uniforms.samplers[i], textureUnit++); // Set shader sampler to use TextureUnit X
     }
     // Bind the "bundled" textures (texture arrays).
     for (let i = 0; i < this.shaderInfo.uniforms.bundleSamplers.length; i++) {
-      const textureUnit = 10 + i; // Offset from the single image samplers.
       const textureID = i < this.textureBundleIDs.length ? this.textureBundleIDs[i] : this.fallbackArrayTextureID;
       gl.activeTexture(gl.TEXTURE0 + textureUnit);
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, textureID);
-      gl.uniform1i(this.shaderInfo.uniforms.bundleSamplers[i], textureUnit);
+      gl.uniform1i(this.shaderInfo.uniforms.bundleSamplers[i], textureUnit++);
     }
 
     // Draw
@@ -540,8 +655,9 @@ export function UIRenderer(canvas, redrawCallback) {
       },
       uniforms: {
         vpSize: bind_uniform(gl, shaderProgram, 'viewport_size'),
-        numCmds: bind_uniform(gl, shaderProgram, 'num_cmds'),
         cmdBufferTex: bind_uniform(gl, shaderProgram, 'cmd_data'),
+        tileCmdRangesBufferTex: bind_uniform(gl, shaderProgram, 'tile_cmd_ranges'),
+        tileCmdsBufferTex: bind_uniform(gl, shaderProgram, 'tile_cmds'),
         samplers: [
           bind_uniform(gl, shaderProgram, 'sampler0'),
           bind_uniform(gl, shaderProgram, 'sampler1'),
@@ -596,6 +712,8 @@ export function UIRenderer(canvas, redrawCallback) {
       // It doesn't support 1D textures either. We're left with a UBO or a 2D image for command data storage.
       // Chose a 2D image because it can support more data than the UBO.
       cmdBufferTexture: gl.createTexture(),
+      tileCmdRangesTexture: gl.createTexture(),
+      tileCmdsTexture: gl.createTexture(),
     };
 
     // Set the vertex positions as a full size rect. Done once, never changes.
@@ -611,16 +729,35 @@ export function UIRenderer(canvas, redrawCallback) {
       1, // Number of mip map levels.
       gl.RGBA32F, // GPU internal format: 4x 32bit float components.
       MAX_CMD_BUFFER_LINE, MAX_CMD_BUFFER_LINE); // Width, height.
-    // Disable mip mapping.
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    disableMipMapping(gl);
+
+    // Create the texture object to be associated with the tile ranges buffer.
+    gl.bindTexture(gl.TEXTURE_2D, this.buffers.tileCmdRangesTexture);
+    gl.texStorage2D(gl.TEXTURE_2D, // Allocate immutable storage.
+      1, // Number of mip map levels.
+      gl.R16UI, // GPU internal format: 16bit unsigned integer components.
+      MAX_TILES + 1, 1); // Width, height.
+    disableMipMapping(gl);
+
+    // Create the texture object to be associated with the tile commands buffer.
+    gl.bindTexture(gl.TEXTURE_2D, this.buffers.tileCmdsTexture);
+    gl.texStorage2D(gl.TEXTURE_2D, // Allocate immutable storage.
+      1, // Number of mip map levels.
+      gl.R16UI, // GPU internal format: 16bit unsigned integer components.
+      TILE_CMDS_BUFFER_LINE, TILE_CMDS_BUFFER_LINE); // Width, height.
+    disableMipMapping(gl);
   }
 
   this.init(canvas);
 }
 
+
+function disableMipMapping(gl) {
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+}
 
 // Get the shader location of an attribute of a shader by name.
 function bind_attr(gl, program, attr_name) {

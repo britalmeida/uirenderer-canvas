@@ -1,5 +1,7 @@
 #version 300 es
 precision highp float;
+precision highp usampler2D;
+precision highp sampler2D;
 precision highp sampler2DArray;
 
 // Command types
@@ -10,12 +12,19 @@ const int CMD_FRAME    = 4;
 const int CMD_IMAGE    = 5;
 const int CMD_CLIP     = 9;
 
+// Constants
+const int TILE_SIZE    = 5; // 5bits = 32px
+const int CMD_DATA_BUFFER_LINE = 512;
+const int TILE_CMDS_BUFFER_LINE = 128;
+const int TILES_CMD_RANGE_BUFFER_LINE = 4 * 1024; // Single line, addresses all possible tiles.
 
 // Inputs
 uniform vec2 viewport_size;
-uniform int num_cmds;
-uniform sampler2D cmd_data;
+uniform sampler2D cmd_data; // 'Global' buffer with all the shape and style commands
+uniform usampler2D tile_cmds; // Commands per tile: packed sequence of cmd_data indexes, one tile after the other.
+uniform usampler2D tile_cmd_ranges; // Where each tile's data is in tile_cmds. List of start indexes.
 
+// Textures
 uniform sampler2DArray bundle_sampler0;
 uniform sampler2DArray bundle_sampler1;
 uniform sampler2DArray bundle_sampler2;
@@ -25,6 +34,7 @@ uniform sampler2D sampler2;
 uniform sampler2D sampler3;
 uniform sampler2D sampler4;
 
+// Color output
 out vec4 fragColor;
 
 // Helpers
@@ -37,21 +47,31 @@ float dot2(vec2 v) { return dot(v, v); }
 float dot2(vec3 v) { return dot(v, v); }
 
 vec4 get_cmd_data(int data_idx) {
-  ivec2 tex_coord = ivec2(data_idx % 512, int(data_idx / 512));
+  ivec2 tex_coord = ivec2(data_idx % CMD_DATA_BUFFER_LINE, int(data_idx / CMD_DATA_BUFFER_LINE));
   return texelFetch(cmd_data, tex_coord, 0);
 }
 
 vec4 get_style_data(int style_idx) {
-  ivec2 tex_coord = ivec2(style_idx % 512, 511);
+  ivec2 tex_coord = ivec2(style_idx % CMD_DATA_BUFFER_LINE, CMD_DATA_BUFFER_LINE-1);
   return texelFetch(cmd_data, tex_coord, 0);
 }
 
+uint get_cmd_data_idx(int tile_cmd_idx) {
+  ivec2 tex_coord = ivec2(tile_cmd_idx % TILE_CMDS_BUFFER_LINE, int(tile_cmd_idx / TILE_CMDS_BUFFER_LINE));
+  return texelFetch(tile_cmds, tex_coord, 0).r;
+}
+
+uint get_tile_cmd_range_start(int tile_idx) {
+  ivec2 tex_coord = ivec2(tile_idx % TILES_CMD_RANGE_BUFFER_LINE, 0);
+  return texelFetch(tile_cmd_ranges, tex_coord, 0).r;
+}
+
 vec4 sample_texture(int sampler_ID, vec2 tex_coord, float slice) {
-  if      (sampler_ID == 0) return texture(sampler0, tex_coord);
-  else if (sampler_ID == 1) return texture(sampler1, tex_coord);
-  else if (sampler_ID == 2) return texture(sampler2, tex_coord);
-  else if (sampler_ID == 3) return texture(sampler3, tex_coord);
-  else if (sampler_ID == 4) return texture(sampler4, tex_coord);
+  if      (sampler_ID == 5) return texture(sampler0, tex_coord);
+  else if (sampler_ID == 6) return texture(sampler1, tex_coord);
+  else if (sampler_ID == 7) return texture(sampler2, tex_coord);
+  else if (sampler_ID == 8) return texture(sampler3, tex_coord);
+  else if (sampler_ID == 9) return texture(sampler4, tex_coord);
   else if (sampler_ID == 10) return texture(bundle_sampler0, vec3(tex_coord.x, tex_coord.y, slice));
   else if (sampler_ID == 11) return texture(bundle_sampler1, vec3(tex_coord.x, tex_coord.y, slice));
   else if (sampler_ID == 12) return texture(bundle_sampler2, vec3(tex_coord.x, tex_coord.y, slice));
@@ -119,11 +139,20 @@ void main() {
 
   vec4 view_clip_rect = vec4(0, 0, viewport_size.x, viewport_size.y);
 
+  // Get the shape commands that overlap the tile where this pixel is.
+  int num_tiles_x = (int(viewport_size.x) >> TILE_SIZE) + 1;
+  int num_tiles_y = (int(viewport_size.y) >> TILE_SIZE) + 1;
+  int num_tiles = num_tiles_x * num_tiles_y;
+  int tile_x = int(frag_coord.x) >> TILE_SIZE;
+  int tile_y = int(frag_coord.y) >> TILE_SIZE;
+  int tile_n = tile_y * num_tiles_x + tile_x;
+  int tile_cmds_idx = int(get_tile_cmd_range_start(tile_n));
+  int tile_cmds_end = int(get_tile_cmd_range_start(tile_n + 1));
+
   // Process the commands with the procedural shape definitions in order.
   // Check if this pixel is inside (or partially inside) each shape and update its color.
-  int data_idx = 0;
-  while (data_idx < num_cmds) {
-
+  while (tile_cmds_idx < tile_cmds_end) {
+    int data_idx = int(get_cmd_data_idx(tile_cmds_idx++));
     vec4 cmd = get_cmd_data(data_idx++);
     int cmd_type = int(cmd[0]);
     int style_idx = int(cmd[1]);
