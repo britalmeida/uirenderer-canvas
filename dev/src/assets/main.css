@@ -1,0 +1,180 @@
+:root {
+  --bg-color: #111;
+  --text-color: #ccc;
+  --text-color-highlight: #fff;
+  --text-color-muted: #999;
+  --text-color-hint: #666;
+  --text-color-accent: rgb(0, 132, 255);
+
+  --panel-bg-color: #191919;
+  --panel-bg-color-highlight: #232323;
+
+  --input-select-bg-color: #292929;
+  --input-select-bg-color-highlight: #323232;
+  --input-box-shadow: 1px 1px 2px 0 rgba(0,0,0,.2);
+
+  --spacer: .25rem;
+  --spacer-2: calc(var(--spacer) * 2);
+  --spacer-3: calc(var(--spacer) * 3);
+
+  --border-color: #292929;
+  --border-radius: .33rem;
+  --border-radius-sm: .2rem;
+  --border-width: .1rem;
+
+  --font-family: -apple-system, BlinkMacSystemFont, avenir next, avenir, segoe ui, helvetica neue, helvetica, Ubuntu, roboto, noto, arial, sans-serif;
+  --font-size-base: 14px;
+  --font-size-small: 12px;
+  --font-size-large: 20px;
+  --font-weight-bold: 600;
+
+  --transition-speed: 150ms;
+}
+
+html, body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+}
+
+h3, h4, h5, h6 {
+  font-weight: normal;
+}
+
+a {
+  color: var(--text-color-accent);
+  transition: color var(--transition-speed) ease-in-out;
+}
+
+a:hover {
+  color: var(--text-color-highlight);
+}
+
+.row {
+  display: flex;
+}
+
+.col {
+  width: 50%;
+}
+
+.col-3 {
+  width: calc(100% / 3);
+}
+
+.col-12 {
+  width: 100%;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+.app-toolbar {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--spacer-3) var(--spacer-2) var(--spacer);
+}
+
+.section-headline {
+  color: var(--text-color-hint);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-bold);
+  margin: 0;
+}
+
+.section-title {
+  color: var(--text-color-highlight);
+  font-size: var(--font-size-large);
+  margin-top: var(--spacer);
+}
+
+.section-thumbnailview {
+  flex: 1;
+}
+
+.section-inspector {
+  width: 30%;
+}
+
+.section-inspector > section {
+  border-radius: var(--border-radius);
+  background-color: var(--panel-bg-color);
+  margin: var(--spacer-2);
+  padding: var(--spacer-3);
+}
+
+section.inspector-videoplayer {
+  padding: var(--spacer-3) var(--spacer-3) 2.66rem;
+}
+
+.toolbar {
+  align-items: center;
+  display: flex;
+  padding: var(--spacer-3) var(--spacer-3) 0;
+}
+
+.toolbar-item {
+  align-items: center;
+  display: flex;
+  margin-right: var(--spacer-3);
+}
+
+.toolbar-item.right {
+  margin-left: auto;
+  margin-right: 0
+}
+
+.toolbar-item label {
+  padding-right: var(--spacer-2);
+}
+
+.breadcrumb-separator {
+  color: var(--text-color-hint);
+  font-weight: var(--font-weight-bold);
+  padding: 0 var(--spacer-2)
+}
+
+/* Input fields. */
+select {
+  align-items: center;
+  background: linear-gradient(to left, var(--input-select-bg-color-highlight) 1.5em, var(--input-select-bg-color) 1.5em);
+  border-radius: var(--border-radius-sm);
+  border: 0;
+  box-shadow: var(--input-box-shadow);
+  color: var(--text-color);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  outline: 0;
+  padding: 0 1.5em 0 var(--spacer);
+  position: relative;
+}
+
+select:hover, select:focus {
+  background: var(--input-select-bg-color-highlight);
+}
+
+select option {
+  background-color: var(--panel-bg-color);
+  color: inherit;
+}
+
+select option:focus {
+  outline: none;
+}
+
+pre {
+  text-align: left;
+}
