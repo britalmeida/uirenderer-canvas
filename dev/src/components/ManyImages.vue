@@ -28,7 +28,7 @@ export default {
     return {
       uiRenderer: null,
       imgBundleID: null,
-      thumbnailSize: [50, 50],
+      imgSourceResolution: [50,50],
       thumbnails: []
     }
   },
@@ -36,31 +36,24 @@ export default {
     uiConfig: function() {
       // Layout constants.
       return {
-        fontSize: 12,
-        selectedHighlight: { width: 1.5, color: [1.0, 0.561, 0.051, 1.0], },
-        currFrameHighlight: { width: 1.5, color: [0.85, 0.8, 0.7, 1.0], },
-        castingHighlight: { width: 1.5, color: [0.2, 0.58, 0.8, 1.0], },
-        thumbOverlayInfo: { textPad: 5, color: [0.11, 0.11, 0.11, 0.8] },
-        taskStatus: { radius: 5, offsetX: 5, offsetY: 6, disabledColor: [0.05, 0.05, 0.05, 0.8] },
-        assignees: { avatarSize: 32, offsetX: 5, offsetY: 5, spaceInBetween: 2 },
         // View.
-        minMargin: 40, // Minimum padding, in pixels, around the thumbnail area. Divide by 2 for one side.
-        totalSpacing: [150, 150], // Maximum accumulated space between thumbs + margin.
-        // Grouped view.
-        groupedView: {
-          summaryText: { spaceBefore: -10, spaceAfter: 12, },
-          groupTitle: { spaceBefore: 4, spaceAfter: 2, },
-          colorRect: { width: 6, xOffset: 12, },
-        },
+        minMargin: 20, // Minimum padding, in pixels, around the thumbnail area. Divide by 2 for one side.
+        totalSpacing: [100, 100], // Maximum accumulated space between thumbs + margin.
       };
     },
   },
   methods: {
     draw: function () {
+      const canvas = document.getElementById('many-images');
+      // Determine where each thumbnail should draw at the maximum possible size for the currently available area
+      let thumbnailSize = UILayout.fitThumbsInGrid(
+        this.thumbnails, this.imgSourceResolution, this.uiConfig, canvas.getBoundingClientRect());
+
+
       const ui = this.uiRenderer;
       ui.beginFrame();
       for (const thumb of this.thumbnails) {
-        ui.addImageFromBundle(thumb.pos[0], thumb.pos[1], this.thumbnailSize[0], this.thumbnailSize[1], this.imgBundleID, thumb.objIdx);
+        ui.addImageFromBundle(thumb.pos[0], thumb.pos[1], thumbnailSize[0], thumbnailSize[1], this.imgBundleID, thumb.objIdx);
       }
       ui.draw();
     }
@@ -70,7 +63,7 @@ export default {
     this.uiRenderer = new UIRenderer(canvas, this.draw);
 
     let thumbUrls = [];
-    for (let i = 0; i < 10; i++) { //starts loop
+    for (let i = 0; i < 450; i++) { //starts loop
       let thumbnail = new UILayout.ThumbnailImage(null, i);
       this.thumbnails.push(thumbnail);
     }
@@ -78,10 +71,7 @@ export default {
     for (const thumb of this.thumbnails) {
       thumbUrls.push(`https://picsum.photos/seed/${(thumb.objIdx + 1) * Math.random()}/50`);
     }
-    this.thumbnailSize = UILayout.fitThumbsInGrid(
-        this.thumbnails, [50, 50], this.uiConfig, canvas.getBoundingClientRect());
-
-    this.imgBundleID = this.uiRenderer.loadImageBundle(thumbUrls, this.thumbnailSize);
+    this.imgBundleID = this.uiRenderer.loadImageBundle(thumbUrls, this.imgSourceResolution);
 
     this.draw();
   }
