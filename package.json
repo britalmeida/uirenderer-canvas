@@ -1,7 +1,7 @@
 {
   "name": "uirenderer-canvas",
-  "version": "1.0.5",
-  "description": "Simple UI renderer for the canvas.",
+  "version": "1.0.6",
+  "description": "Minimal 2D UI system for the Web",
   "main": "index.js",
   "scripts": {
     "test": ""
@@ -9,7 +9,9 @@
   "files": [
     "glsl/",
     "lib/",
-    "index.js"
+    "index.js",
+    "README.md",
+    "LICENSE"
   ],
   "repository": {
     "type": "git",
