@@ -1,29 +1,24 @@
 <template>
   <div id="app">
-    <Shapes />
-    <Images />
-    <ManyImages />
+    <nav>
+      <router-link to="/">Home</router-link> |
+      <router-link to="/many-images">Many Images</router-link> |
+      <router-link to="/gantt">Gantt</router-link>
+    </nav>
+    <router-view/>
   </div>
 </template>
 
 <script>
 import './assets/main.css'
-import Shapes from '@/components/Shapes'
-import Images from "@/components/Images";
-import ManyImages from "@/components/ManyImages";
 
 export default {
   name: 'App',
-  components: {
-    ManyImages,
-    Images,
-    Shapes
-  }
+
 }
 </script>
 
 <style>
-
 #app {
   text-align: center;
   margin-top: 60px;
