@@ -2,6 +2,7 @@ import Vue from 'vue'
 import VueRouter from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import GanttView from '@/views/GanttView';
+import TextView from '@/views/TextView';
 
 Vue.use(VueRouter)
 
@@ -24,6 +25,11 @@ const routes = [
     name: 'gantt',
     component: GanttView
   },
+  {
+    path: '/text',
+    name: 'text',
+    component: TextView
+  }
 ]
 
 const router = new VueRouter({

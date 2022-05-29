@@ -3,7 +3,8 @@
     <nav>
       <router-link to="/">Home</router-link> |
       <router-link to="/many-images">Many Images</router-link> |
-      <router-link to="/gantt">Gantt</router-link>
+      <router-link to="/gantt">Gantt</router-link> |
+      <router-link to="/text">Text</router-link>
     </nav>
     <router-view/>
   </div>
