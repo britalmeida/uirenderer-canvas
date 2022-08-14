@@ -1,5 +1,5 @@
 <template>
-  <div class="example-container">
+  <div className="example-container">
     <h1>Gantt</h1>
     <canvas width="600" height="120" id="gantt"></canvas>
   </div>

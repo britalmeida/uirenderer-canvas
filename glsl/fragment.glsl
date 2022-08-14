@@ -9,7 +9,8 @@ const int CMD_LINE     = 1;
 const int CMD_TRIANGLE = 2;
 const int CMD_RECT     = 3;
 const int CMD_FRAME    = 4;
-const int CMD_IMAGE    = 5;
+const int CMD_GLYPH    = 5;
+const int CMD_IMAGE    = 6;
 const int CMD_CLIP     = 9;
 
 // Constants
@@ -25,6 +26,7 @@ uniform usampler2D tile_cmds; // Commands per tile: packed sequence of cmd_data 
 uniform usampler2D tile_cmd_ranges; // Where each tile's data is in tile_cmds. List of start indexes.
 
 // Textures
+uniform sampler2D text_glyph_sampler;
 uniform sampler2DArray bundle_sampler0;
 uniform sampler2DArray bundle_sampler1;
 uniform sampler2DArray bundle_sampler2;
@@ -229,6 +231,31 @@ void main() {
       float dist_to_outer_rect = dist_to_round_rect(frag_coord, outer_rect, corner_radius);
       float dist_to_inner_rect = dist_to_round_rect(frag_coord, inner_rect, inner_corner_radius);
       shape_dist = max(dist_to_outer_rect, 1.0 - dist_to_inner_rect);
+
+    } else if (cmd_type == CMD_GLYPH) {
+
+      vec4 glyph_def = get_cmd_data(data_idx++);
+      if (clip_dist > 1.0) continue;
+
+      // Shape is the same as the rectangle with rounded corners.
+      vec4 rect = vec4(shape_bounds.x, shape_bounds.y, shape_bounds.z - 1.0, shape_bounds.w - 1.0);
+      shape_dist = dist_to_round_rect(frag_coord, rect, 0.0);
+
+      // Color of each fragment is given by a glyph atlas texture lookup.
+      vec2 cmd_rect_coord = vec2(
+        (frag_coord.x - rect.x) / (rect.z - rect.x),
+        (frag_coord.y - rect.y) / (rect.w - rect.y));
+
+      vec2 glyph_idx = vec2(glyph_def[0], glyph_def[1]);
+      float glyph_px_size = 24.0;
+      vec2 glyph_atlas_size = vec2(480.0, 120.0);
+      vec2 glyph_size_in_atlas = glyph_px_size / glyph_atlas_size;
+
+      vec2 tex_coord = (glyph_idx + cmd_rect_coord) * glyph_size_in_atlas;
+
+      float alpha = shape_color.a;
+      shape_color = texture(text_glyph_sampler, tex_coord);
+      shape_color.a *= alpha;
 
     } else if (cmd_type == CMD_IMAGE) {
 
