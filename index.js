@@ -1,6 +1,11 @@
 const
-  UIRenderer = require('./lib/shading'),
-  UILayout = require('./lib/layout');
+  Shading = require('./lib/shading'),
+  Layout = require('./lib/layout'),
+  Text = require('./lib/textbox');
 
-exports.UIRenderer = UIRenderer;
-exports.UILayout = UILayout;
+exports.Rect = Shading.Rect;
+exports.View = Shading.View;
+exports.UIRenderer = Shading.UIRenderer;
+exports.UILayout = Layout;
+exports.TextBox = Text.TextBox;
+exports.TextStyle = Text.TextStyle;
