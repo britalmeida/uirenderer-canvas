@@ -2,6 +2,11 @@
 import vs_source from '../glsl/vertex.glsl';
 import fs_source from '../glsl/fragment.glsl';
 
+// Shorthands for meaningful types.
+type vec2 = [number, number];
+type vec4 = [number, number, number, number];
+
+
 // Representation of a rectangle for geometry operations.
 class Rect {
   left: number;
@@ -25,7 +30,7 @@ class Rect {
         this.top  <= y && y <= this.bottom;
   }
 
-  widen (val: number): void {
+  widen(val: number): void {
     this.left -= val;
     this.top -= val;
     this.width += val * 2.0;
@@ -33,11 +38,11 @@ class Rect {
     this.right = this.left + this.width;
     this.bottom = this.top + this.height;
   }
-  widened (val: number): Rect {
+  widened(val: number): Rect {
     return new Rect(this.left - val, this.top - val,
         this.width + val * 2.0, this.height + val * 2.0);
   }
-  shrink (val: number): void {
+  shrink(val: number): void {
     this.left += val;
     this.top += val;
     this.width -= val * 2.0;
@@ -46,7 +51,7 @@ class Rect {
     this.bottom = this.top + this.height;
   }
 
-  encapsulate (point: [number, number]): void {
+  encapsulate(point: [number, number]): void {
     this.left = Math.min(this.left, point[0]);
     this.right = Math.max(this.right, point[0]);
     this.top = Math.min(this.top, point[1]);
@@ -55,6 +60,7 @@ class Rect {
     this.height = this.bottom - this.top;
   }
 }
+
 
 // 2D Coordinate system mapped in a rectangular area.
 // Represents Zoom and Pan by mapping coordinates within the rectangular area to
@@ -82,23 +88,23 @@ class View extends Rect {
   }
 
   // Transform a position value to this View's coordinates, in the horizontal axis.
-  transformPosX (p: number): number {
+  transformPosX(p: number): number {
     return (p - this.left - this.offsetX) * this.scaleX + this.left;
   }
   // Transform a position to this View's coordinates, in the vertical axis.
-  transformPosY (p: number): number {
+  transformPosY(p: number): number {
     return (p - this.top - this.offsetY) * this.scaleY + this.top;
   }
   // Transform a distance value to this View's coordinates, in the horizontal axis.
-  transformDistX (d: number): number {
+  transformDistX(d: number): number {
     return d * this.scaleX;
   }
   // Transform a distance value to this View's coordinates, in the vertical axis.
-  transformDistY (d: number): number {
+  transformDistY(d: number): number {
     return d * this.scaleY;
   }
   // Transform a rectangle to this View's coordinates.
-  transformRect (r: Rect): Rect {
+  transformRect(r: Rect): Rect {
     return new Rect(
       this.transformPosX(r.left),
       this.transformPosY(r.top),
@@ -108,7 +114,7 @@ class View extends Rect {
 
   // Truncate the given rectangle to the view area (intersection).
   // The given rectangle should be in the View's coordinates.
-  clampRect (r: Rect): Rect {
+  clampRect(r: Rect): Rect {
     return new Rect(
       Math.max(r.left, this.left),
       Math.max(r.right, this.right),
@@ -118,80 +124,95 @@ class View extends Rect {
 }
 
 
-function UIRenderer (canvas, redrawCallback) {
+// Constants shared with the shader configuration.
+// Changes to these values need ot be reflected in the shader as well.
+
+// Command types
+const enum CMD {
+  LINE     = 1,
+  TRIANGLE = 2,
+  RECT     = 3,
+  FRAME    = 4,
+  GLYPH    = 5,
+  IMAGE    = 6,
+  CLIP     = 9,
+}
+
+// Rendering context
+const MAX_CMD_BUFFER_LINE = 512; // Note: constants are hardcoded on the shader side as well.
+const MAX_CMD_DATA   = MAX_CMD_BUFFER_LINE * MAX_CMD_BUFFER_LINE;
+const MAX_STYLE_CMDS = MAX_CMD_BUFFER_LINE;
+const MAX_SHAPE_CMDS = MAX_CMD_DATA - MAX_STYLE_CMDS;
+const TILE_SIZE = 5;            // Tile side: 32 pixels = 5 bits.
+const MAX_TILES = 4 * 1024 - 1; // Must fit in the tileCmdRanges texture. +1 to fit the end index of the last tile.
+const MAX_CMDS_PER_TILE = 64;
+const TILE_CMDS_BUFFER_LINE = 128;
+
+
+class UIRenderer {
   // Rendering context
-  this.gl = null;
-  const MAX_CMD_BUFFER_LINE = 512; // Note: constants are hardcoded on the shader side as well.
-  const MAX_CMD_DATA = MAX_CMD_BUFFER_LINE * MAX_CMD_BUFFER_LINE;
-  const MAX_STYLE_CMDS = MAX_CMD_BUFFER_LINE;
-  const MAX_SHAPE_CMDS = MAX_CMD_DATA - MAX_STYLE_CMDS;
-  const TILE_SIZE = 5; // Tile side: 32 pixels = 5 bits.
-  const MAX_TILES = 4 * 1024 - 1; // Must fit in the tileCmdRanges texture. +1 to fit the end index of the last tile
-  const MAX_CMDS_PER_TILE = 64;
-  const TILE_CMDS_BUFFER_LINE = 128;
+  private gl = null;
 
   // Callback to trigger a redraw of the view component using this renderer.
-  this.redrawCallback = redrawCallback;
+  private readonly redrawCallback;
 
   // Viewport transform
-  this.views = [];
-  this.viewport = {width: 1, height: 1};
+  private views: View[] = [];
+  private viewport = {width: 1, height: 1};
 
   // Shader data
-  this.shaderInfo = {};
-  this.buffers = {};
-  this.cmdData = new Float32Array(MAX_CMD_DATA * 4); // Pre-allocate commands of 4 floats (128 width).
-  this.cmdDataIdx = 0;
-  this.glyphCacheTextureID = null;
-  this.fallback2DTextureID = null;
-  this.fallbackArrayTextureID = null;
-  this.textureIDs = [];
-  this.textureBundleIDs = [];
-  this.loadingTextureIDs = [];
+  private shaderInfo;
+  private buffers;
+  private cmdData = new Float32Array(MAX_CMD_DATA * 4); // Pre-allocate commands of 4 floats (128 width).
+  private cmdDataIdx = 0;
+  private glyphCacheTextureID:    WebGLTexture = null;
+  private fallback2DTextureID:    WebGLTexture = null;
+  private fallbackArrayTextureID: WebGLTexture = null;
+  private textureIDs:             WebGLTexture[] = [];
+  private textureBundleIDs:       WebGLTexture[] = [];
+  private loadingTextureIDs:      WebGLTexture[] = [];
   // Tiles
-  this.num_tiles_x = 1;
-  this.num_tiles_y = 1;
-  this.cmdsPerTile = new Array(MAX_TILES); // Unpacked list of commands, indexed by tile. Used when adding shapes.
-  this.tileCmds = new Uint16Array(TILE_CMDS_BUFFER_LINE * TILE_CMDS_BUFFER_LINE); // Packed list of commands.
-  this.tileCmdRanges = new Uint16Array(MAX_TILES + 1); // Where each tile's data is in tileCmds. List of start indexes.
-
-  // Command types
-  const CMD_LINE     = 1;
-  const CMD_TRIANGLE = 2;
-  const CMD_RECT     = 3;
-  const CMD_FRAME    = 4;
-  const CMD_GLYPH    = 5;
-  const CMD_IMAGE    = 6;
-  const CMD_CLIP     = 9;
+  private num_tiles_x = 1;
+  private num_tiles_y = 1;
+  private num_tiles_n = 1;
+  private cmdsPerTile = new Array(MAX_TILES); // Unpacked list of commands, indexed by tile. Used when adding shapes.
+  private tileCmds = new Uint16Array(TILE_CMDS_BUFFER_LINE * TILE_CMDS_BUFFER_LINE); // Packed list of commands.
+  private tileCmdRanges = new Uint16Array(MAX_TILES + 1); // Where each tile's data is in tileCmds. List of start indexes.
 
   // Style
-  this.styleDataStartIdx = (MAX_CMD_DATA - MAX_STYLE_CMDS) * 4; // Start writing style to the last cmd data texture line.
-  this.styleDataIdx = this.styleDataStartIdx;
-  this.styleStep = 2 * 4; // Number of floats that a single style needs.
+  private styleDataStartIdx = (MAX_CMD_DATA - MAX_STYLE_CMDS) * 4; // Start writing style to the last cmd data texture line.
+  private styleDataIdx = this.styleDataStartIdx;
+  private styleStep = 2 * 4; // Number of floats that a single style needs.
 
   // State
-  this.stateColor = [-1, -1, -1, -1];
-  this.stateLineWidth = 1.0;
-  this.stateCorner = 0.0;
-  this.stateChanges = 0;
+  private stateColor = [-1, -1, -1, -1];
+  private stateLineWidth = 1.0;
+  private stateCorner = 0.0;
+  private stateChanges = 0;
+
+
+  constructor(canvas, redrawCallback) {
+    this.redrawCallback = redrawCallback;
+    this.init(canvas);
+  }
 
   // Add Primitives.
 
-  this.addRect = function (left, top, width, height, color, cornerWidth = 0) {
+  addRect(left: number, top: number, width: number, height: number, color: vec4, cornerWidth: number = 0) {
     const bounds = new Rect(left, top, width, height);
-    this.addPrimitiveShape(CMD_RECT, bounds, color, null, cornerWidth);
+    this.addPrimitiveShape(CMD.RECT, bounds, color, null, cornerWidth);
   }
 
-  this.addFrame = function (left, top, width, height, lineWidth, color, cornerWidth = 0) {
+  addFrame(left: number, top: number, width: number, height: number, lineWidth: number, color: vec4, cornerWidth: number = 0) {
     const bounds = new Rect(left, top, width, height);
-    this.addPrimitiveShape(CMD_FRAME, bounds, color, lineWidth, cornerWidth);
+    this.addPrimitiveShape(CMD.FRAME, bounds, color, lineWidth, cornerWidth);
   }
 
-  this.addLine = function (p1, p2, width, color) {
+  addLine(p1: vec2, p2: vec2, width: number, color: vec4) {
     let bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.encapsulate(p2);
     bounds.widen(Math.round(width * 0.5 + 0.01));
-    if (this.addPrimitiveShape(CMD_LINE, bounds, color, width, null)) {
+    if (this.addPrimitiveShape(CMD.LINE, bounds, color, width, null)) {
       let w = this.cmdDataIdx;
       const v = this.getView();
       // Data 2 - Shape parameters
@@ -204,11 +225,11 @@ function UIRenderer (canvas, redrawCallback) {
     }
   }
 
-  this.addTriangle = function (p1, p2, p3, color) {
+  addTriangle(p1: vec2, p2: vec2, p3: vec2, color: vec4) {
     let bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.encapsulate(p2);
     bounds.encapsulate(p3);
-    if (this.addPrimitiveShape(CMD_TRIANGLE, bounds, color, null, null)) {
+    if (this.addPrimitiveShape(CMD.TRIANGLE, bounds, color, null, null)) {
       let w = this.cmdDataIdx;
       const v = this.getView();
       // Data 2 - Shape parameters
@@ -225,21 +246,21 @@ function UIRenderer (canvas, redrawCallback) {
     }
   }
 
-  this.addCircle = function (p1, radius, color) {
+  addCircle(p1: vec2, radius: number, color: vec4) {
     // A circle is a rectangle with very rounded corners.
     let bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.widen(radius);
     this.addRect(bounds.left, bounds.top, bounds.width, bounds.height, color, radius);
   }
 
-  this.addCircleFrame = function (p1, radius, lineWidth, color) {
+  addCircleFrame(p1: vec2, radius: number, lineWidth: number, color: vec4) {
     // A circle is a rectangle with very rounded corners.
     let bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.widen(radius);
     this.addFrame(bounds.left, bounds.top, bounds.width, bounds.height, lineWidth, color, radius);
   }
 
-  this.addText = function (text, p1, size, color) {
+  addText(text, p1: vec2, size: number, color: vec4) {
     const monoCharWidth = size;
     let advance = 0;
     const map = ['!','"','#','$','%','&','\'','(',')','*','+',',','-','.','/','0','1','2','3','4','5','6','7','8','9',':',';','<','=','>','?','@','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','[','\\',']','^','_','`','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','{','|','}','~',' '];
@@ -260,12 +281,12 @@ function UIRenderer (canvas, redrawCallback) {
     }
   }
 
-  this.addGlyph = function (glyphX, glyphY, bounds) {
+  addGlyph(glyphX: number, glyphY: number, bounds) {
 
     // Skip the bounds clipping and color/style pushing. It should have been done on the calling side.
 
     // Write the shape command to the command buffer and add it to the tiles with which this shape overlaps.
-    if (this.writeCmdToTiles(CMD_GLYPH, bounds)) {
+    if (this.writeCmdToTiles(CMD.GLYPH, bounds)) {
       let w = this.cmdDataIdx;
       // Data 2 - Glyph selection
       this.cmdData[w++] = glyphX; // sampler id, address, italic?
@@ -276,14 +297,14 @@ function UIRenderer (canvas, redrawCallback) {
     }
   }
 
-  this.addImage = function (left, top, width, height, textureID, cornerWidth = 0, alpha = 1.0) {
+  addImage(left: number, top: number, width: number, height: number, textureID, cornerWidth: number = 0, alpha: number = 1.0) {
     const samplerIdx = this.pushTextureID(textureID,
         this.textureIDs, this.shaderInfo.uniforms.samplers, this.fallback2DTextureID,
         "Maximum number of single images exceeded. Images need to be bundled.");
     this.addImageInternal(left, top, width, height, samplerIdx, 0, cornerWidth, alpha);
   }
 
-  this.addImageFromBundle = function (left, top, width, height, textureID, slice, cornerWidth = 0, alpha = 1.0) {
+  addImageFromBundle(left: number, top: number, width: number, height: number, textureID, slice: number, cornerWidth: number = 0, alpha: number = 1.0) {
     const samplerIdx = 10 + this.pushTextureID(textureID,
         this.textureBundleIDs, this.shaderInfo.uniforms.bundleSamplers, this.fallbackArrayTextureID,
         "Maximum number of image bundles exceeded. Increase supported amount in code?");
@@ -293,7 +314,7 @@ function UIRenderer (canvas, redrawCallback) {
   // Internal functions to write data to the command buffers.
 
   // Private. Add the given texture ID to the list of textures that will be used this frame.
-  this.pushTextureID = function (textureID, texturesToDraw, samplersList, fallbackTextureID, limitExceededMsg) {
+  pushTextureID(textureID, texturesToDraw, samplersList, fallbackTextureID, limitExceededMsg) {
     let samplerIdx = 0;
     const idx = texturesToDraw.indexOf(textureID);
     if (idx === -1) {
@@ -320,9 +341,9 @@ function UIRenderer (canvas, redrawCallback) {
   }
 
   // Private. Helper function to add an image command, either bundled or standalone.
-  this.addImageInternal = function (left, top, width, height, samplerIdx, slice, cornerWidth, alpha) {
+  addImageInternal(left: number, top: number, width, height, samplerIdx, slice, cornerWidth: number, alpha) {
     const bounds = new Rect(left, top, width, height);
-    if (this.addPrimitiveShape(CMD_IMAGE, bounds, [1.0, 1.0, 1.0, alpha], null, cornerWidth)) {
+    if (this.addPrimitiveShape(CMD.IMAGE, bounds, [1.0, 1.0, 1.0, alpha], null, cornerWidth)) {
       let w = this.cmdDataIdx;
       // Data 2 - Shape parameters
       this.cmdData[w++] = samplerIdx;
@@ -335,7 +356,7 @@ function UIRenderer (canvas, redrawCallback) {
 
   // Private. Write the given shape to the global command buffer and add it to the tiles with which it overlaps.
   // Returns false if it was unable to allocate the command.
-  this.writeCmdToTiles = function (cmdType, bounds) {
+  writeCmdToTiles(cmdType, bounds) {
 
     // Get the w(rite) index for the global command buffer.
     let w = this.cmdDataIdx;
@@ -384,7 +405,7 @@ function UIRenderer (canvas, redrawCallback) {
   }
 
   // Private. Write the given style to the global style buffer if it is different from the current active style.
-  this.pushStyleIfNew = function (color, lineWidth, corner) {
+  pushStyleIfNew(color: vec4, lineWidth, corner) {
 
     if (!this.stateColor.every((c, i) => c === color[i]) // Is color array different?
         || (lineWidth !== null && this.stateLineWidth !== lineWidth) // Is line width used for this shape and different?
@@ -415,7 +436,7 @@ function UIRenderer (canvas, redrawCallback) {
   }
 
   // Private. Write the given shape and its style to the command buffers, if it is in the current view.
-  this.addPrimitiveShape = function (cmdType, bounds, color, lineWidth, corner) {
+  addPrimitiveShape(cmdType, bounds, color: vec4, lineWidth, corner) {
 
     // Pan and zoom the shape positioning according to the current view.
     const v = this.getView();
@@ -437,7 +458,7 @@ function UIRenderer (canvas, redrawCallback) {
 
   // Private. Write the given shape and its style to the command buffers, if it is in the current view.
   // As this is text, pan the text with the view, but keep it fixed size.
-  this.addPrimitiveGlyph = function (left, top, advance, width, height, color) {
+  addPrimitiveGlyph(left: number, top: number, advance, width, height, color: vec4) {
 
     // Pan the glyph according to the current view so that it moves,
     // but it keeps a fixed size instead of responding to zoom.
@@ -454,11 +475,11 @@ function UIRenderer (canvas, redrawCallback) {
     this.pushStyleIfNew(color, null, null);
 
     // Write the shape command to the command buffer and add it to the tiles with which this shape overlaps.
-    return this.writeCmdToTiles(CMD_GLYPH, bounds);
+    return this.writeCmdToTiles(CMD.GLYPH, bounds);
   }
 
   // Private. Add a clip command to the global command buffer.
-  this.addClipRect = function (left, top, right, bottom) {
+  addClipRect(left: number, top: number, right, bottom) {
     // Write clip rect information for the shader.
 
     // Get the w(rite) index for the global command buffer.
@@ -482,7 +503,7 @@ function UIRenderer (canvas, redrawCallback) {
     }
 
     // Data 0 - Header
-    this.cmdData[w++] = CMD_CLIP;
+    this.cmdData[w++] = CMD.CLIP;
     w += 3;
     // Data 1 - Bounds
     this.cmdData[w++] = left;
@@ -496,7 +517,7 @@ function UIRenderer (canvas, redrawCallback) {
 
   // Create a GPU texture object (returns the ID, usable immediately) and
   // asynchronously load the image data from the given url onto it.
-  this.loadImage = function (url) {
+  loadImage(url) {
     const gl = this.gl;
     const redrawCallback = this.redrawCallback;
     const loadingTextureIDs = this.loadingTextureIDs;
@@ -534,7 +555,7 @@ function UIRenderer (canvas, redrawCallback) {
   // Create a GPU texture object (returns the ID, usable immediately) and asynchronously load
   // the image data from all the given urls as slices. All images must have the same resolution
   // and can be indexed later in the order they were given.
-  this.loadImageBundle = function (urls, resolution) {
+  loadImageBundle(urls, resolution) {
     const gl = this.gl;
     const redrawCallback = this.redrawCallback;
     let loadedSlices = 0;
@@ -579,18 +600,18 @@ function UIRenderer (canvas, redrawCallback) {
 
   // Views
 
-  this.getView = function() {
+  getView() {
     return this.views[this.views.length - 1];
   }
 
-  this.pushView = function(x, y, w, h, scale, offset) {
+  pushView(x: number, y: number, w: number, h: number, scale: vec2, offset: vec2) {
     const view = new View(x, y, w, h, scale, offset);
     this.views.push(view);
     this.addClipRect(x +1, y +1, x + w -1, y + h -1);
     return view;
   }
 
-  this.popView = function() {
+  popView() {
     this.views.pop();
     const v = this.getView();
     if (v) { this.addClipRect(v.left, v.top, v.right, v.bottom); }
@@ -600,7 +621,7 @@ function UIRenderer (canvas, redrawCallback) {
   // Render Loop
 
   // Initialize the state for a new frame
-  this.beginFrame = function() {
+  beginFrame() {
     // Cache the viewport size and number of tiles for this frame.
     this.viewport.width = this.gl.canvas.width;
     this.viewport.height = this.gl.canvas.height;
@@ -628,7 +649,7 @@ function UIRenderer (canvas, redrawCallback) {
   }
 
   // Draw a frame with the current primitive commands.
-  this.draw = function() {
+  draw() {
     const gl = this.gl;
 
     // Set this view to occupy the full canvas.
@@ -760,7 +781,7 @@ function UIRenderer (canvas, redrawCallback) {
   }
 
   // Initialize the renderer: compile the shader and setup static data.
-  this.init = function (canvas) {
+  init(canvas) {
 
     // Initialize the GL context.
     const gl = canvas.getContext('webgl2');
@@ -883,8 +904,6 @@ function UIRenderer (canvas, redrawCallback) {
       TILE_CMDS_BUFFER_LINE, TILE_CMDS_BUFFER_LINE); // Width, height.
     disableMipMapping(gl);
   }
-
-  this.init(canvas);
 }
 
 
@@ -896,7 +915,7 @@ function disableMipMapping(gl) {
 }
 
 // Get the shader location of an attribute of a shader by name.
-function bind_attr(gl, program, attr_name) {
+function bind_attr(gl, program, attr_name): GLint {
   const attr_idx = gl.getAttribLocation(program, attr_name);
   if (attr_idx === -1)
     console.error("Can not bind attribute '", attr_name, "' for shader.");
@@ -905,7 +924,7 @@ function bind_attr(gl, program, attr_name) {
 
 
 // Get the shader location of an uniform of a shader by name.
-function bind_uniform(gl, program, attr_name) {
+function bind_uniform(gl, program, attr_name): GLint {
   const loc = gl.getUniformLocation(program, attr_name);
   if (loc === null)
     console.error("Can not bind uniform '", attr_name, "' for shader.");
@@ -914,7 +933,7 @@ function bind_uniform(gl, program, attr_name) {
 
 
 // Initialize a shader program with th given vertex and fragment shader source code.
-function init_shader_program(gl, vs_source, fs_source) {
+function init_shader_program(gl, vs_source, fs_source): WebGLProgram | null {
 
   const vs = load_shader(gl, gl.VERTEX_SHADER, vs_source);
   const fs = load_shader(gl, gl.FRAGMENT_SHADER, fs_source);
@@ -955,5 +974,6 @@ function load_shader(gl, shader_type, source_code) {
 
   return shader;
 }
+
 
 export { Rect, View, UIRenderer }
