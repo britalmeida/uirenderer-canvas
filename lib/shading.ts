@@ -151,10 +151,10 @@ const TILE_CMDS_BUFFER_LINE = 128;
 
 class UIRenderer {
   // Rendering context
-  private gl = null;
+  private gl: WebGL2RenderingContext = null;
 
   // Callback to trigger a redraw of the view component using this renderer.
-  private readonly redrawCallback;
+  private readonly redrawCallback: Function;
 
   // Viewport transform
   private views: View[] = [];
@@ -191,24 +191,24 @@ class UIRenderer {
   private stateChanges = 0;
 
 
-  constructor(canvas, redrawCallback) {
+  constructor(canvas: HTMLCanvasElement, redrawCallback: Function) {
     this.redrawCallback = redrawCallback;
     this.init(canvas);
   }
 
   // Add Primitives.
 
-  addRect(left: number, top: number, width: number, height: number, color: vec4, cornerWidth: number = 0) {
+  addRect(left: number, top: number, width: number, height: number, color: vec4, cornerWidth: number = 0): void {
     const bounds = new Rect(left, top, width, height);
     this.addPrimitiveShape(CMD.RECT, bounds, color, null, cornerWidth);
   }
 
-  addFrame(left: number, top: number, width: number, height: number, lineWidth: number, color: vec4, cornerWidth: number = 0) {
+  addFrame(left: number, top: number, width: number, height: number, lineWidth: number, color: vec4, cornerWidth: number = 0): void {
     const bounds = new Rect(left, top, width, height);
     this.addPrimitiveShape(CMD.FRAME, bounds, color, lineWidth, cornerWidth);
   }
 
-  addLine(p1: vec2, p2: vec2, width: number, color: vec4) {
+  addLine(p1: vec2, p2: vec2, width: number, color: vec4): void {
     let bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.encapsulate(p2);
     bounds.widen(Math.round(width * 0.5 + 0.01));
@@ -225,7 +225,7 @@ class UIRenderer {
     }
   }
 
-  addTriangle(p1: vec2, p2: vec2, p3: vec2, color: vec4) {
+  addTriangle(p1: vec2, p2: vec2, p3: vec2, color: vec4): void {
     let bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.encapsulate(p2);
     bounds.encapsulate(p3);
@@ -246,21 +246,21 @@ class UIRenderer {
     }
   }
 
-  addCircle(p1: vec2, radius: number, color: vec4) {
+  addCircle(p1: vec2, radius: number, color: vec4): void {
     // A circle is a rectangle with very rounded corners.
     let bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.widen(radius);
     this.addRect(bounds.left, bounds.top, bounds.width, bounds.height, color, radius);
   }
 
-  addCircleFrame(p1: vec2, radius: number, lineWidth: number, color: vec4) {
+  addCircleFrame(p1: vec2, radius: number, lineWidth: number, color: vec4): void {
     // A circle is a rectangle with very rounded corners.
     let bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.widen(radius);
     this.addFrame(bounds.left, bounds.top, bounds.width, bounds.height, lineWidth, color, radius);
   }
 
-  addText(text, p1: vec2, size: number, color: vec4) {
+  addText(text, p1: vec2, size: number, color: vec4): void {
     const monoCharWidth = size;
     let advance = 0;
     const map = ['!','"','#','$','%','&','\'','(',')','*','+',',','-','.','/','0','1','2','3','4','5','6','7','8','9',':',';','<','=','>','?','@','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','[','\\',']','^','_','`','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','{','|','}','~',' '];
@@ -281,7 +281,7 @@ class UIRenderer {
     }
   }
 
-  addGlyph(glyphX: number, glyphY: number, bounds) {
+  addGlyph(glyphX: number, glyphY: number, bounds): void {
 
     // Skip the bounds clipping and color/style pushing. It should have been done on the calling side.
 
@@ -297,14 +297,14 @@ class UIRenderer {
     }
   }
 
-  addImage(left: number, top: number, width: number, height: number, textureID, cornerWidth: number = 0, alpha: number = 1.0) {
+  addImage(left: number, top: number, width: number, height: number, textureID, cornerWidth: number = 0, alpha: number = 1.0): void {
     const samplerIdx = this.pushTextureID(textureID,
         this.textureIDs, this.shaderInfo.uniforms.samplers, this.fallback2DTextureID,
         "Maximum number of single images exceeded. Images need to be bundled.");
     this.addImageInternal(left, top, width, height, samplerIdx, 0, cornerWidth, alpha);
   }
 
-  addImageFromBundle(left: number, top: number, width: number, height: number, textureID, slice: number, cornerWidth: number = 0, alpha: number = 1.0) {
+  addImageFromBundle(left: number, top: number, width: number, height: number, textureID, slice: number, cornerWidth: number = 0, alpha: number = 1.0): void {
     const samplerIdx = 10 + this.pushTextureID(textureID,
         this.textureBundleIDs, this.shaderInfo.uniforms.bundleSamplers, this.fallbackArrayTextureID,
         "Maximum number of image bundles exceeded. Increase supported amount in code?");
@@ -314,7 +314,7 @@ class UIRenderer {
   // Internal functions to write data to the command buffers.
 
   // Private. Add the given texture ID to the list of textures that will be used this frame.
-  pushTextureID(textureID, texturesToDraw, samplersList, fallbackTextureID, limitExceededMsg) {
+  pushTextureID(textureID, texturesToDraw, samplersList, fallbackTextureID, limitExceededMsg): number {
     let samplerIdx = 0;
     const idx = texturesToDraw.indexOf(textureID);
     if (idx === -1) {
@@ -341,7 +341,7 @@ class UIRenderer {
   }
 
   // Private. Helper function to add an image command, either bundled or standalone.
-  addImageInternal(left: number, top: number, width, height, samplerIdx, slice, cornerWidth: number, alpha) {
+  addImageInternal(left: number, top: number, width, height, samplerIdx, slice, cornerWidth: number, alpha): void {
     const bounds = new Rect(left, top, width, height);
     if (this.addPrimitiveShape(CMD.IMAGE, bounds, [1.0, 1.0, 1.0, alpha], null, cornerWidth)) {
       let w = this.cmdDataIdx;
@@ -356,7 +356,7 @@ class UIRenderer {
 
   // Private. Write the given shape to the global command buffer and add it to the tiles with which it overlaps.
   // Returns false if it was unable to allocate the command.
-  writeCmdToTiles(cmdType, bounds) {
+  writeCmdToTiles(cmdType, bounds): boolean {
 
     // Get the w(rite) index for the global command buffer.
     let w = this.cmdDataIdx;
@@ -405,7 +405,7 @@ class UIRenderer {
   }
 
   // Private. Write the given style to the global style buffer if it is different from the current active style.
-  pushStyleIfNew(color: vec4, lineWidth, corner) {
+  pushStyleIfNew(color: vec4, lineWidth, corner): void {
 
     if (!this.stateColor.every((c, i) => c === color[i]) // Is color array different?
         || (lineWidth !== null && this.stateLineWidth !== lineWidth) // Is line width used for this shape and different?
@@ -436,7 +436,7 @@ class UIRenderer {
   }
 
   // Private. Write the given shape and its style to the command buffers, if it is in the current view.
-  addPrimitiveShape(cmdType, bounds, color: vec4, lineWidth, corner) {
+  addPrimitiveShape(cmdType, bounds, color: vec4, lineWidth, corner): boolean {
 
     // Pan and zoom the shape positioning according to the current view.
     const v = this.getView();
@@ -458,7 +458,7 @@ class UIRenderer {
 
   // Private. Write the given shape and its style to the command buffers, if it is in the current view.
   // As this is text, pan the text with the view, but keep it fixed size.
-  addPrimitiveGlyph(left: number, top: number, advance, width, height, color: vec4) {
+  addPrimitiveGlyph(left: number, top: number, advance, width, height, color: vec4): boolean {
 
     // Pan the glyph according to the current view so that it moves,
     // but it keeps a fixed size instead of responding to zoom.
@@ -479,7 +479,7 @@ class UIRenderer {
   }
 
   // Private. Add a clip command to the global command buffer.
-  addClipRect(left: number, top: number, right, bottom) {
+  addClipRect(left: number, top: number, right, bottom): boolean {
     // Write clip rect information for the shader.
 
     // Get the w(rite) index for the global command buffer.
@@ -517,7 +517,7 @@ class UIRenderer {
 
   // Create a GPU texture object (returns the ID, usable immediately) and
   // asynchronously load the image data from the given url onto it.
-  loadImage(url) {
+  loadImage(url): WebGLTexture {
     const gl = this.gl;
     const redrawCallback = this.redrawCallback;
     const loadingTextureIDs = this.loadingTextureIDs;
@@ -555,7 +555,7 @@ class UIRenderer {
   // Create a GPU texture object (returns the ID, usable immediately) and asynchronously load
   // the image data from all the given urls as slices. All images must have the same resolution
   // and can be indexed later in the order they were given.
-  loadImageBundle(urls, resolution) {
+  loadImageBundle(urls, resolution): WebGLTexture {
     const gl = this.gl;
     const redrawCallback = this.redrawCallback;
     let loadedSlices = 0;
@@ -600,18 +600,18 @@ class UIRenderer {
 
   // Views
 
-  getView() {
+  getView(): View {
     return this.views[this.views.length - 1];
   }
 
-  pushView(x: number, y: number, w: number, h: number, scale: vec2, offset: vec2) {
+  pushView(x: number, y: number, w: number, h: number, scale: vec2, offset: vec2): View {
     const view = new View(x, y, w, h, scale, offset);
     this.views.push(view);
     this.addClipRect(x +1, y +1, x + w -1, y + h -1);
     return view;
   }
 
-  popView() {
+  popView(): void {
     this.views.pop();
     const v = this.getView();
     if (v) { this.addClipRect(v.left, v.top, v.right, v.bottom); }
@@ -621,7 +621,7 @@ class UIRenderer {
   // Render Loop
 
   // Initialize the state for a new frame
-  beginFrame() {
+  beginFrame(): void {
     // Cache the viewport size and number of tiles for this frame.
     this.viewport.width = this.gl.canvas.width;
     this.viewport.height = this.gl.canvas.height;
@@ -649,7 +649,7 @@ class UIRenderer {
   }
 
   // Draw a frame with the current primitive commands.
-  draw() {
+  draw(): void {
     const gl = this.gl;
 
     // Set this view to occupy the full canvas.
@@ -781,7 +781,7 @@ class UIRenderer {
   }
 
   // Initialize the renderer: compile the shader and setup static data.
-  init(canvas) {
+  init(canvas: HTMLCanvasElement): void {
 
     // Initialize the GL context.
     const gl = canvas.getContext('webgl2');
