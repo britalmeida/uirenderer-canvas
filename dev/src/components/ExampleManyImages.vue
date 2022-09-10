@@ -2,7 +2,7 @@
 .example-container
   h1 480 Images
   canvas(
-    ref="canvasManyImages"
+    ref="canvas"
     width="470"
     height="600"
     )
@@ -31,7 +31,7 @@ let uiRenderer: UIRenderer = null;
 let imgBundleID: WebGLTexture | null = null;
 let imgSourceResolution = [50, 50];
 let thumbnails: UILayout.ThumbnailImage[] = [];
-const canvasManyImages = ref(null);
+const canvas = ref(null);
 
 const uiConfig = {
     minMargin: 20, // Minimum padding, in pixels, around the thumbnail area. Divide by 2 for one side.
@@ -41,7 +41,7 @@ const uiConfig = {
 function draw() {
   // Determine where each thumbnail should draw at the maximum possible size for the currently available area
   let thumbnailSize = UILayout.fitThumbsInGrid(
-    thumbnails, imgSourceResolution, uiConfig, canvasManyImages.value.getBoundingClientRect());
+    thumbnails, imgSourceResolution, uiConfig, canvas.value.getBoundingClientRect());
 
   const ui = uiRenderer;
   ui.beginFrame();
@@ -52,7 +52,7 @@ function draw() {
 }
 
 onMounted(() => {
-  uiRenderer = new UIRenderer(canvasManyImages.value, draw);
+  uiRenderer = new UIRenderer(canvas.value, draw);
 
   let thumbUrls = [];
   for (let i = 0; i < 450; i++) { //starts loop
