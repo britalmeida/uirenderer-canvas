@@ -1,5 +1,10 @@
+import { Rect } from './shading';
+
 // Set the position of the given thumbnails in a centered grid. Returns thumbnail size.
-function fitThumbsInGrid(thumbs, originalImageSize, uiConfig, rect) {
+function fitThumbsInGrid(thumbs: ThumbnailImage[],
+                         originalImageSize: [number, number],
+                         uiConfig: { totalSpacing: [number, number]; minMargin: number },
+                         rect: Rect) {
 
   const numImages = thumbs.length;
 
@@ -84,7 +89,15 @@ function fitThumbsInGrid(thumbs, originalImageSize, uiConfig, rect) {
 }
 
 // Set the position of the given thumbnails and groups. Flows from top-left. Returns thumbnail size.
-function fitThumbsInGroup(summaryText, groups, thumbs, originalImageSize, uiConfig, rect) {
+function fitThumbsInGroup(summaryText,
+                          groups,
+                          thumbs: ThumbnailImage[],
+                          originalImageSize: [number, number],
+                          uiConfig: { fontSize: number, minMargin: number,
+                                      groupedView: {summaryText: { spaceBefore: number, spaceAfter: number },
+                                                    groupTitle: { spaceBefore: number, spaceAfter: number },
+                                                    colorRect: { width: number, xOffset: number } }},
+                          rect: Rect) {
 
   const numGroups = groups.length;
   //console.log("Assigned", thumbs.length, "thumbnails to", numGroups, "groups");
@@ -224,7 +237,7 @@ function fitThumbsInGroup(summaryText, groups, thumbs, originalImageSize, uiConf
 }
 
 
-function getFitFactor(availableSpace, numThumbs, originalImageSize) {
+function getFitFactor(availableSpace: number, numThumbs: number, originalImageSize: number): number {
   const res = Math.round(availableSpace / numThumbs);
   // Spacing must be at least 1/10th of the thumbnail size.
   const minSpacing = Math.round(res * 0.1);
@@ -234,7 +247,7 @@ function getFitFactor(availableSpace, numThumbs, originalImageSize) {
 
 // Get the remaining space not occupied by thumbnails and split it into margins
 // and spacing between the thumbnails.
-function calculateSpacingCentered(totalAvailable, thumbSize, numThumbs, minMargin) {
+function calculateSpacingCentered(totalAvailable: number, thumbSize: number, numThumbs: number, minMargin: number): [number, number] {
 
   const availableSpace = totalAvailable - thumbSize * numThumbs;
   //console.log("remaining space", availableSpace, "px =", totalAvailable, "-", thumbSize, "*", numThumbs);
@@ -258,7 +271,7 @@ function calculateSpacingCentered(totalAvailable, thumbSize, numThumbs, minMargi
 
 // Get the remaining space not occupied by thumbnails and split it into spacing
 // between the thumbnails. Margins are fixed on the top-left.
-function calculateSpacingTopLeftFlow(usableSpace, thumbSize, numThumbs, minSideMargin) {
+function calculateSpacingTopLeftFlow(usableSpace: number, thumbSize: number, numThumbs: number, minSideMargin: number): number {
   const remainingSpace = usableSpace - thumbSize * numThumbs - minSideMargin * 2;
   //console.log("remaining space", remainingSpace, "px");
 
@@ -279,33 +292,41 @@ function calculateSpacingTopLeftFlow(usableSpace, thumbSize, numThumbs, minSideM
 
 // UI element specifying how a thumbnail should be drawn.
 class ThumbnailImage {
+
+  // Image display
+  pos = [0, 0]; // Position in px where the image should be displayed in canvas coordinates.
+  // Represented object (shot/asset...)
+  obj; // Object that this thumbnail represents, such as a shot, asset or person..
+  objIdx; // Index in the array of objects.
+  // Grouped view
+  group = null; // Group that this thumbnail belongs to.
+  posInGroup = -1; // Relative position in the thumbnails of this group.
+
   constructor(obj, objIdx) {
-    // Image display
-    this.pos = [0, 0]; // Position in px where the image should be displayed in canvas coordinates.
-    // Represented object (shot/asset...)
-    this.obj = obj; // Object that this thumbnail represents, such as a shot, asset or person..
-    this.objIdx = objIdx; // Index in the array of objects.
-    // Grouped view
-    this.group = null; // Group that this thumbnail belongs to.
-    this.posInGroup = -1; // Relative position in the thumbnails of this group.
+    this.obj = obj;
+    this.objIdx = objIdx;
   }
 }
 
 
 // UI element representing a container of shots, with its own drawable name and a colorful rectangle.
 class ThumbnailGroup {
-  constructor(displayStr, displayColor, criteriaObj) {
-    // Group title
-    this.name = typeof displayStr !== 'undefined' ? displayStr : '';
 
-    this.namePos = [0, 0]; // Position in px where the group name should be displayed in canvas coordinates.
-    // Group color
-    this.color = typeof displayColor !== 'undefined' ? displayColor : [0.8, 0.0, 0.0, 1.0];
-    this.colorRect = [0, 0, 0, 0];
-    // Contained thumbnails
-    this.thumbIdxs = []; // Index in the thumbnails array.
-    // Object that this group represents, e.g. a Sequence, a Task Status, or an Assignee.
-    this.criteriaObj = typeof criteriaObj !== 'undefined' ? criteriaObj : null;
+  // Group title
+  name: string;
+  namePos = [0, 0]; // Position in px where the group name should be displayed in canvas coordinates.
+  // Group color
+  color;
+  colorRect = [0, 0, 0, 0];
+  // Contained thumbnails
+  thumbIdxs = []; // Index in the thumbnails array.
+  // Object that this group represents, e.g. a Sequence, a Task Status, or an Assignee.
+  criteriaObj: Object;
+
+  constructor(displayStr: string = "", displayColor= [0.8, 0.0, 0.0, 1.0], criteriaObj: Object = null) {
+    this.name = displayStr;
+    this.color = displayColor;
+    this.criteriaObj = criteriaObj;
   }
 }
 

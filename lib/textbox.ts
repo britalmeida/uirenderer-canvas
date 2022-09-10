@@ -1,4 +1,4 @@
-import { Rect } from './shading';
+import {Rect, UIRenderer} from './shading';
 
 class TextStyle {
 
@@ -31,30 +31,39 @@ class TextStyle {
   size = 24;
   advance = 24 - 8;
   lineSpacing = 24 + 2;
-  color = [0.86, 0.86, 0.86, 1.0];
+  color;
   shadow = [0.0, 0.0, 0.0, 0.5];
 
-  constructor(size, color = this.color) {
+  constructor(size: number, color = [0.86, 0.86, 0.86, 1.0]) {
     this.size = size;
     this.advance = size - size * 0.5;
-    this.lineSpacing = size + 2.0;    this.color = color;
+    this.lineSpacing = size + 2.0;
+    this.color = color;
   }
 
-  getTextWidthPx = function (text) {
+  getTextWidthPx(text: string): number {
     return text.length * this.advance + 10; // 10 = approx text box margin
   }
 }
 
 class TextBox {
 
-  constructor(renderer, text, left, top, width, height, style) {
+  // Context
+  renderer: UIRenderer;
+  textStyle: TextStyle;
+
+  // Textbox
+  rect: Rect;
+  margin = 5.0;
+  text: string;
+
+  constructor(renderer: UIRenderer, text: string, left: number, top: number, width: number, height: number, style: TextStyle) {
     // Context
     this.renderer = renderer;
     this.textStyle = style;
 
     // Textbox
     this.rect = new Rect(left, top, width, height);
-    this.margin = 5.0;
     this.text = text;
 
 
@@ -79,7 +88,7 @@ class TextBox {
 
     // Change style if it is different from the last used.
     //if (style.color !== this.textStyle.color)
-      this.renderer.pushStyleIfNew(textStyle.color);
+      this.renderer.pushStyleIfNew(textStyle.color, null, null);
     this.textStyle.size = fontSize;
 
     // Layout the text.
@@ -129,7 +138,7 @@ class TextBox {
       // Glyph selection
       const idx = textStyle.fontAtlas.map.indexOf(character);
       const glyphRow = (idx % textStyle.fontAtlas.charsPerRow);
-      const glyphCol = Math.trunc(idx / textStyle.fontAtlas.charsPerRow);
+      const glyphCol = Math.floor(idx / textStyle.fontAtlas.charsPerRow);
 
       // Clip the glyph bounds.
       const glyphBounds = new Rect(x, y, fontSize, fontSize);

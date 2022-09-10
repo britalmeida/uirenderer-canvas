@@ -405,7 +405,7 @@ class UIRenderer {
   }
 
   // Private. Write the given style to the global style buffer if it is different from the current active style.
-  pushStyleIfNew(color: vec4, lineWidth, corner): void {
+  pushStyleIfNew(color: vec4, lineWidth: number | null, corner: number | null): void {
 
     if (!this.stateColor.every((c, i) => c === color[i]) // Is color array different?
         || (lineWidth !== null && this.stateLineWidth !== lineWidth) // Is line width used for this shape and different?
