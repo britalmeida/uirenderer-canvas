@@ -1,16 +1,8 @@
-<template>
-  <div class="gantt">
-    <Gantt />
-  </div>
+<template lang="pug">
+.gantt
+  ExampleGantt
 </template>
 
-<script>
-import Gantt from '@/components/Gantt';
-
-export default {
-  name: 'GanttView',
-  components: {
-    Gantt,
-  }
-}
+<script setup lang="ts">
+import ExampleGantt from '@/components/ExampleGantt.vue';
 </script>

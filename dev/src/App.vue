@@ -1,25 +1,20 @@
-<template>
-  <div id="app">
-    <nav>
-      <router-link to="/">Home</router-link> |
-      <router-link to="/many-images">Many Images</router-link> |
-      <router-link to="/gantt">Gantt</router-link> |
-      <router-link to="/text">Text</router-link>
-    </nav>
-    <router-view/>
-  </div>
+<template lang="pug">
+header
+  RouterLink(to="/") Home
+  RouterLink(to="/many-images") Many Images
+  RouterLink(to="/gantt") Gantt 
+  RouterLink(to="/text") Text
+RouterView
+
 </template>
 
-<script>
+<script setup lang="ts">
 import './assets/main.css'
-
-export default {
-  name: 'App',
-
-}
+import { RouterLink, RouterView } from 'vue-router'
 </script>
 
-<style>
+
+<style scoped>
 #app {
   text-align: center;
   margin-top: 60px;

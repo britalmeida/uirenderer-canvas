@@ -1,19 +1,10 @@
-<template>
-  <div class="home">
-    <Shapes />
-    <Images />
-  </div>
+<template lang="pug">
+.home
+  ExampleShapes
+  ExampleImages
 </template>
 
-<script>
-import Shapes from '@/components/Shapes'
-import Images from '@/components/Images';
-
-export default {
-  name: 'HomeView',
-  components: {
-    Images,
-    Shapes
-  }
-}
+<script setup lang="ts">
+  import ExampleShapes from '@/components/ExampleShapes.vue';
+  import ExampleImages from '@/components/ExampleImages.vue';
 </script>

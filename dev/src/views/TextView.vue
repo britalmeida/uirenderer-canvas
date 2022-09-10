@@ -1,14 +1,12 @@
-<template>
-  <div class="text">
-    <ExampleText />
-  </div>
+<template lang="pug">
+.text
+  ExampleText
 </template>
 
-<script>
-import ExampleText from '@/components/ExampleText';
+<script lang="ts">
+import ExampleText from '@/components/ExampleText.vue';
 
 export default {
-  name: 'TextView',
   components: {
     ExampleText,
   }

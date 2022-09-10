@@ -1,5 +1,3 @@
-import { UILayout } from "..";
-
 // Set the position of the given thumbnails in a centered grid. Returns thumbnail size.
 function fitThumbsInGrid(thumbs, originalImageSize, uiConfig, rect) {
 
