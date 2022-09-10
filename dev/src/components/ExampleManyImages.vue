@@ -24,7 +24,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { UIRenderer, UILayout } from '../../../index';
 
 let uiRenderer: UIRenderer = null;
