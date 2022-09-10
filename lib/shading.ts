@@ -3,21 +3,29 @@ import vs_source from '../glsl/vertex.glsl';
 import fs_source from '../glsl/fragment.glsl';
 
 // Representation of a rectangle for geometry operations.
-function Rect (x, y, w, h) {
+class Rect {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  width: number;
+  height: number;
 
-  this.left   = x;
-  this.right  = x + w;
-  this.top    = y;
-  this.bottom = y + h;
-  this.width  = w;
-  this.height = h;
+  constructor(x: number, y: number, w: number, h: number) {
+    this.left = x;
+    this.right = x + w;
+    this.top = y;
+    this.bottom = y + h;
+    this.width = w;
+    this.height = h;
+  }
 
-  this.contains = function (x, y) {
+  contains (x: number, y: number): boolean {
     return this.left <= x && x <= this.right &&
         this.top  <= y && y <= this.bottom;
   }
 
-  this.widen = function (val) {
+  widen (val: number): void {
     this.left -= val;
     this.top -= val;
     this.width += val * 2.0;
@@ -25,11 +33,11 @@ function Rect (x, y, w, h) {
     this.right = this.left + this.width;
     this.bottom = this.top + this.height;
   }
-  this.widened = function (val) {
+  widened (val: number): Rect {
     return new Rect(this.left - val, this.top - val,
         this.width + val * 2.0, this.height + val * 2.0);
   }
-  this.shrink = function (val) {
+  shrink (val: number): void {
     this.left += val;
     this.top += val;
     this.width -= val * 2.0;
@@ -38,7 +46,7 @@ function Rect (x, y, w, h) {
     this.bottom = this.top + this.height;
   }
 
-  this.encapsulate = function (point) {
+  encapsulate (point: [number, number]): void {
     this.left = Math.min(this.left, point[0]);
     this.right = Math.max(this.right, point[0]);
     this.top = Math.min(this.top, point[1]);
@@ -48,35 +56,49 @@ function Rect (x, y, w, h) {
   }
 }
 
-function View (x, y, w, h, scale, offset) {
-  this.left = x;
-  this.right = x + w;
-  this.top = y;
-  this.bottom = y + h;
-  this.width = w;
-  this.height = h;
-  this.scaleX = scale[0];
-  this.scaleY = scale[1];
-  this.offsetX = offset[0];
-  this.offsetY = offset[1];
+// 2D Coordinate system mapped in a rectangular area.
+// Represents Zoom and Pan by mapping coordinates within the rectangular area to
+// coordinates in the View space (e.g. [0-20] -> x2 Zoom -> [0-40]).
+// The rectangular area is additionally used to clip the contents, i.e. with the
+// 2x zoom and no pan, the original [0-10] are shown in the [0-20] space, while
+// the original [10-20] lie outside the View window.
+class View extends Rect {
+  scaleX: number;
+  scaleY: number;
+  offsetX: number;
+  offsetY: number;
 
-  this.transformPosX = function(p) {
+  constructor(x: number, y: number, w: number, h: number,
+              scale: [number, number], offset: [number, number]) {
+    super(x, y, w, h);
+    this.scaleX = scale[0];
+    this.scaleY = scale[1];
+    this.offsetX = offset[0];
+    this.offsetY = offset[1];
+  }
+
+  getXYScale(): number {
+    return Math.min(this.scaleX, this.scaleY);
+  }
+
+  // Transform a position value to this View's coordinates, in the horizontal axis.
+  transformPosX (p: number): number {
     return (p - this.left - this.offsetX) * this.scaleX + this.left;
   }
-
-  this.transformPosY = function(p) {
+  // Transform a position to this View's coordinates, in the vertical axis.
+  transformPosY (p: number): number {
     return (p - this.top - this.offsetY) * this.scaleY + this.top;
   }
-
-  this.transformDistX = function(d) {
+  // Transform a distance value to this View's coordinates, in the horizontal axis.
+  transformDistX (d: number): number {
     return d * this.scaleX;
   }
-
-  this.transformDistY = function(d) {
+  // Transform a distance value to this View's coordinates, in the vertical axis.
+  transformDistY (d: number): number {
     return d * this.scaleY;
   }
-
-  this.transformRect = function(r) {
+  // Transform a rectangle to this View's coordinates.
+  transformRect (r: Rect): Rect {
     return new Rect(
       this.transformPosX(r.left),
       this.transformPosY(r.top),
@@ -86,18 +108,15 @@ function View (x, y, w, h, scale, offset) {
 
   // Truncate the given rectangle to the view area (intersection).
   // The given rectangle should be in the View's coordinates.
-  this.clampRect = function(r) {
+  clampRect (r: Rect): Rect {
     return new Rect(
       Math.max(r.left, this.left),
       Math.max(r.right, this.right),
       Math.max(r.top, this.top),
       Math.max(r.bottom, this.bottom));
   }
-
-  this.getXYScale = function() {
-    return Math.min(this.scaleX, this.scaleY);
-  }
 }
+
 
 function UIRenderer (canvas, redrawCallback) {
   // Rendering context
@@ -232,7 +251,7 @@ function UIRenderer (canvas, redrawCallback) {
         // Data 2 - Glyph selection
         const idx = map.indexOf(character);
         this.cmdData[w++] = (idx % charsPerRow); // sampler id, address, italic?
-        this.cmdData[w++] = Math.trunc(idx / charsPerRow);
+        this.cmdData[w++] = Math.floor(idx / charsPerRow);
         w += 2;
 
         this.cmdDataIdx = w;
