@@ -54,7 +54,7 @@ class TextBox {
 
   // Textbox
   rect: Rect;
-  margin = 5.0;
+  margin = 4.0;
   text: string;
 
   constructor(renderer: UIRenderer, text: string, left: number, top: number, width: number, height: number, style: TextStyle) {
@@ -105,7 +105,7 @@ class TextBox {
         // Glyph selection should influence the actual advance and kerning.
         x += stepX;
 
-        if (x + stepX >= bounds.right) {
+        if (x + stepX > bounds.right) {
           numLines++;
 
           x = bounds.left;
@@ -150,7 +150,7 @@ class TextBox {
       }
 
       x += stepX;
-      if (x + stepX >= bounds.right) {
+      if (x + stepX > bounds.right) {
         if (textStyle.flow === TextStyle.Flow.Crop)
           break;
 
@@ -163,9 +163,9 @@ class TextBox {
       }
     }
 
-    //this.renderer.addFrame(bounds.left, bounds.top, bounds.width, bounds.height, 1.0, [0.86, 0.86, 0.86, 1.0])
+    //this.renderer.addFrame(bounds.left, bounds.top, bounds.width, bounds.height, 0.5, [0.86, 0.86, 0.86, 1.0])
     bounds = tb.rect;
-    //this.renderer.addFrame(bounds.left, bounds.top, bounds.width, bounds.height, 1.0, [0.86, 0.86, 0.86, 1.0])
+    //this.renderer.addFrame(bounds.left, bounds.top, bounds.width, bounds.height, 0.5, [0.86, 0.86, 0.86, 1.0])
 
   }
 
