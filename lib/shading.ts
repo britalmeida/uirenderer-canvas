@@ -29,6 +29,10 @@ class Rect {
     return this.left <= x && x <= this.right &&
         this.top  <= y && y <= this.bottom;
   }
+  intersects (other: Rect): boolean {
+    return this.left <= other.right && other.left <= this.right &&
+        this.top <= other.bottom && other.top <= this.bottom;
+  }
 
   widen(val: number): void {
     this.left -= val;
