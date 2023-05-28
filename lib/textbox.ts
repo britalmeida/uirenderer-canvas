@@ -75,10 +75,13 @@ class TextBox {
 
     const v = this.renderer.getView();
     let bounds = new Rect(tb.rect.left, tb.rect.top, tb.rect.width, tb.rect.height);
-    // Reduce the rectangle by a fixed size margin in px (zoom independent).
-    bounds.shrink(tb.margin);
     // Move (pan) and zoom the rectangle according to the view stack.
     bounds = v.transformRect(bounds);
+    // Reduce the rectangle by a fixed size margin in px (zoom independent).
+    bounds.shrink(tb.margin);
+    // Workaround: nudge the box a little to compensate.
+    bounds.left -= 2; bounds.right -= 2;
+    bounds.top += 2; bounds.bottom += 2;
     // Clamp the rectangle to the visible area.
     const visibleBounds = v.clampRect(bounds);
 
@@ -166,7 +169,6 @@ class TextBox {
     //this.renderer.addFrame(bounds.left, bounds.top, bounds.width, bounds.height, 0.5, [0.86, 0.86, 0.86, 1.0])
     bounds = tb.rect;
     //this.renderer.addFrame(bounds.left, bounds.top, bounds.width, bounds.height, 0.5, [0.86, 0.86, 0.86, 1.0])
-
   }
 
 }
