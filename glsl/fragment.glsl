@@ -6,7 +6,7 @@ precision highp sampler2DArray;
 
 // Command types
 const int CMD_LINE     = 1;
-const int CMD_TRIANGLE = 2;
+const int CMD_QUAD     = 2;
 const int CMD_RECT     = 3;
 const int CMD_FRAME    = 4;
 const int CMD_GLYPH    = 5;
@@ -91,35 +91,38 @@ float dist_to_line(vec2 pos, vec2 p1, vec2 p2, float line_radius) {
   return length(u - v * h) - line_radius + 0.5;
 }
 
-// Calculate distance to a triangle defined by the given points.
-float dist_to_triangle(vec2 pos, vec2 a, vec2 b, vec2 c) {
+// Calculate distance to a quadrilateral polygon defined by the given points.
+float dist_to_quad(vec2 pos, vec2 a, vec2 b, vec2 c, vec2 d) {
   vec2 ab = b - a; vec2 ap = pos - a;
   vec2 bc = c - b; vec2 bp = pos - b;
-  vec2 ca = a - c; vec2 cp = pos - c;
-  vec3 nor = vec3(0.0, 0.0, ab.x * ca.y - ab.y * ca.x); // cross(ab, ca)
+  vec2 cd = d - c; vec2 cp = pos - c;
+  vec2 da = a - d; vec2 dp = pos - d;
+  vec3 nor = vec3(0.0, 0.0, ab.x * da.y - ab.y * da.x); // cross(ab, da)
 
   return sqrt(
     ( sign(scalar_triple_product(ap, ab, nor)) +
       sign(scalar_triple_product(bp, bc, nor)) +
-      sign(scalar_triple_product(cp, ca, nor)) < 2.0
+      sign(scalar_triple_product(cp, cd, nor)) +
+      sign(scalar_triple_product(dp, da, nor)) < 3.0
     ) ?
-        min(min(
-          dot2(ab * clamp(dot(ab,ap)/dot2(ab), 0.0,1.0) - ap),
-          dot2(bc * clamp(dot(bc,bp)/dot2(bc), 0.0,1.0) - bp)),
-          dot2(ca * clamp(dot(ca,cp)/dot2(ca), 0.0,1.0) - cp))
-      : 0.0f // 2D case
+        min(min(min(
+          dot2(ab * clamp(dot(ab,ap)/dot2(ab), 0.0, 1.0) - ap),
+          dot2(bc * clamp(dot(bc,bp)/dot2(bc), 0.0, 1.0) - bp)),
+          dot2(cd * clamp(dot(cd,cp)/dot2(cd), 0.0, 1.0) - cp)),
+          dot2(da * clamp(dot(da,dp)/dot2(da), 0.0, 1.0) - dp))
+      : 0.0f // 2D case. Clamp to zero so that any point inside the quad has distance 0.
   );
 }
 
 // Calculate distance to a rectangle with round corners.
 float dist_to_round_rect(vec2 pos, vec4 rect, float corner_radius) {
   // Divide the rectangle in quadrants and calculate the distance from the given
-  // fragment's position to the center. First pad with the corner size and then
-  // take that from the resulting distance.
+  // fragment's position to the center.
   vec2 mid = vec2((rect.x + rect.z), (rect.y + rect.w)) * 0.5;
   float dist_x = (pos.x < mid.x) ? (rect.x - pos.x) : (pos.x - rect.z);
   float dist_y = (pos.y < mid.y) ? (rect.y - pos.y) : (pos.y - rect.w);
 
+  // First pad with the corner size and then take that from the resulting distance.
   // Clamp to zero so that any point inside the rect has distance 0.
   dist_x = max(dist_x + corner_radius, 0.0);
   dist_y = max(dist_y + corner_radius, 0.0);
@@ -199,13 +202,13 @@ void main() {
       float line_radius = line_width * 0.5;
       shape_dist = dist_to_line(frag_coord, vec2(shape_def1.xy), vec2(shape_def1.zw), line_radius);
 
-    } else if (cmd_type == CMD_TRIANGLE) {
+    } else if (cmd_type == CMD_QUAD) {
 
       vec4 shape_def1 = get_cmd_data(data_idx++);
       vec4 shape_def2 = get_cmd_data(data_idx++);
       if (clip_dist > 1.0) continue;
 
-      shape_dist = dist_to_triangle(frag_coord, vec2(shape_def1.xy), vec2(shape_def1.zw), vec2(shape_def2.xy));
+      shape_dist = dist_to_quad(frag_coord, vec2(shape_def1.xy), vec2(shape_def1.zw), vec2(shape_def2.xy), vec2(shape_def2.zw));
 
     } else if (cmd_type == CMD_RECT) {
 

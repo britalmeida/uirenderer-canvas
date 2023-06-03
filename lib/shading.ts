@@ -134,7 +134,7 @@ class View extends Rect {
 // Command types
 const enum CMD {
   LINE     = 1,
-  TRIANGLE = 2,
+  QUAD     = 2,
   RECT     = 3,
   FRAME    = 4,
   GLYPH    = 5,
@@ -229,11 +229,12 @@ class UIRenderer {
     }
   }
 
-  addTriangle(p1: vec2, p2: vec2, p3: vec2, color: vec4): void {
+  addQuad(p1: vec2, p2: vec2, p3: vec2, p4: vec2, color: vec4): void {
     let bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.encapsulate(p2);
     bounds.encapsulate(p3);
-    if (this.addPrimitiveShape(CMD.TRIANGLE, bounds, color, null, null)) {
+    bounds.encapsulate(p4);
+    if (this.addPrimitiveShape(CMD.QUAD, bounds, color, null, null)) {
       let w = this.cmdDataIdx;
       const v = this.getView();
       // Data 2 - Shape parameters
@@ -244,10 +245,25 @@ class UIRenderer {
       // Data 3 - Shape parameters II
       this.cmdData[w++] = v.transformPosX(p3[0]);
       this.cmdData[w++] = v.transformPosY(p3[1]);
-      w += 2;
+      this.cmdData[w++] = v.transformPosX(p4[0]);
+      this.cmdData[w++] = v.transformPosY(p4[1]);
+      w += 4;
 
       this.cmdDataIdx = w;
     }
+  }
+
+  addTriangle(p1: vec2, p2: vec2, p3: vec2, color: vec4): void {
+    // Repeat the last point, to make the triangle a quad.
+    this.addQuad(p1, p2, p3, p3, color);
+  }
+
+  addDiamond(pos: vec2, width: number, height: number, color: vec4): void {
+    const p1 : vec2 = [pos[0] - width * 0.5, pos[1]];
+    const p2 : vec2 = [pos[0]              , pos[1] - height * 0.5];
+    const p3 : vec2 = [pos[0] + width * 0.5, pos[1]];
+    const p4 : vec2 = [pos[0]              , pos[1] + height * 0.5];
+    this.addQuad(p1, p2, p3, p4, color);
   }
 
   addCircle(p1: vec2, radius: number, color: vec4): void {
