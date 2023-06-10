@@ -33,5 +33,18 @@ Architecturally, the renderer works with a single quad divided in tiles and a co
 
 The JS side composes the command list with shape definitions from a client application and pushes them to the shader.
 
-The fragment/pixel shader is responsible for the actual rendering and compositing of shapes using their analitical definition to calculate pixel coverage.
+The fragment/pixel shader is responsible for the actual rendering and compositing of shapes using their analytical definition to calculate pixel coverage.
 This allows for nice looking pixel based effects such as drop shadows and rounded corners without tessellating vertex lists.
+
+
+## Building and Packaging
+Currently, we configured `.tscofing.json` with the only purpose of building type declaration (`.d.ts`).
+This means that all the compiler flags are specified in `tsconfig.json` and the `build:types` command in `package.json` simply calls `tsc`.
+
+This command is also called everything we do publish with `npm publish`.
+
+
+## Publishing
+* Bump the version in `package.json`
+* Run `npm publish`
+* For beta: `npm publish --tag beta`

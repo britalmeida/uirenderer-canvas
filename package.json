@@ -1,18 +1,22 @@
 {
   "name": "uirenderer-canvas",
-  "version": "1.0.7-beta.1",
+  "version": "1.0.7-beta.2",
   "description": "Minimal 2D UI system for the Web",
   "main": "index.js",
   "scripts": {
-    "test": ""
+    "build:types": "tsc",
+    "prepublishOnly": "yarn run build:types"
   },
   "files": [
     "glsl/",
     "lib/",
+    "types/",
     "index.js",
+    "index.ts",
     "README.md",
     "LICENSE"
   ],
+  "types": "./types/index.d.ts",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/britalmeida/uirenderer-canvas.git"

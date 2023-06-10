@@ -1,5 +1,7 @@
 // Load the vertex and fragment shader sources.
+// @ts-ignore
 import vs_source from '../glsl/vertex.glsl';
+// @ts-ignore
 import fs_source from '../glsl/fragment.glsl';
 
 // Shorthands for meaningful types.
