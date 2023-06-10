@@ -4,6 +4,8 @@ import vs_source from '../glsl/vertex.glsl';
 // @ts-ignore
 import fs_source from '../glsl/fragment.glsl';
 
+import {fontInconsolataBlobUrl} from '../assets/blobs';
+
 // Shorthands for meaningful types.
 type vec2 = [number, number];
 type vec4 = [number, number, number, number];
@@ -900,7 +902,7 @@ class UIRenderer {
     // Create the Glyph Cache
     {
       gl.activeTexture(gl.TEXTURE0);
-      this.glyphCacheTextureID = this.loadImage('/24px_inconsolata_bitmap_font.png');
+      this.glyphCacheTextureID = this.loadImage(fontInconsolataBlobUrl);
     }
 
     // Generate GPU buffer IDs that will be filled with data later for the shader to use.
