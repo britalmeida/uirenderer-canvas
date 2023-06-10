@@ -1,3 +1,3 @@
-export { Rect, View, UIRenderer } from './lib/shading';
-export { TextBox, TextStyle } from './lib/textbox';
-export * as UILayout from './lib/layout';
+export { Rect, View, UIRenderer } from './src/shading';
+export { TextBox, TextStyle } from './src/textbox';
+export * as UILayout from './src/layout';

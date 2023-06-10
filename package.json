@@ -1,6 +1,6 @@
 {
   "name": "uirenderer-canvas",
-  "version": "1.0.7-beta.3",
+  "version": "1.0.7-beta.4",
   "description": "Minimal 2D UI system for the Web",
   "main": "index.js",
   "scripts": {
@@ -9,8 +9,9 @@
   },
   "files": [
     "glsl/",
-    "lib/",
+    "src/",
     "types/",
+    "assets/*.ts",
     "index.js",
     "index.ts",
     "README.md",
