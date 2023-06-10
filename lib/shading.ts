@@ -317,51 +317,67 @@ class UIRenderer {
     }
   }
 
-  addImage(left: number, top: number, width: number, height: number, textureID, cornerWidth: number = 0, alpha: number = 1.0): void {
-    const samplerIdx = this.pushTextureID(textureID,
-        this.textureIDs, this.shaderInfo.uniforms.samplers, this.fallback2DTextureID,
-        "Maximum number of single images exceeded. Images need to be bundled.");
+  addImage(left: number, top: number, width: number, height: number, textureID: WebGLTexture, cornerWidth: number = 0, alpha: number = 1.0): void {
+    // Request the texture image as in use for this frame, if not in the bind list already.
+    const textureRequestIdx = this.pushTextureID(textureID, this.textureIDs);
+
+    // Get the shader sampler ID for the standalone texture, or -1 for the loading and -2 for error textures.
+    let samplerIdx = 5 + textureRequestIdx; // Standalone images start at samplerID 5.
+    if (textureRequestIdx < 0) {
+      samplerIdx = textureRequestIdx; // Keep loading/error indexes.
+    } else if (this.textureIDs.length >= this.shaderInfo.uniforms.samplers.length) {
+      console.warn("Maximum number of single images exceeded. Images need to be bundled.");
+      samplerIdx = -2; // Show images out of sampler count budget as visible problems with the error texture.
+    }
+
+    // Add the image command.
     this.addImageInternal(left, top, width, height, samplerIdx, 0, cornerWidth, alpha);
   }
 
-  addImageFromBundle(left: number, top: number, width: number, height: number, textureID, slice: number, cornerWidth: number = 0, alpha: number = 1.0): void {
-    const samplerIdx = 10 + this.pushTextureID(textureID,
-        this.textureBundleIDs, this.shaderInfo.uniforms.bundleSamplers, this.fallbackArrayTextureID,
-        "Maximum number of image bundles exceeded. Increase supported amount in code?");
-    this.addImageInternal(left, top, width, height, samplerIdx, slice, cornerWidth, alpha);
+  addImageFromBundle(left: number, top: number, width: number, height: number, textureID: WebGLTexture, slice: number, cornerWidth: number = 0, alpha: number = 1.0): void {
+    // Request the texture image as in use for this frame, if not in the bind list already.
+    const textureRequestIdx = this.pushTextureID(textureID, this.textureBundleIDs);
+
+    // Get the shader sampler ID for the bundle texture, or -1 for the loading and -2 for error textures.
+    let samplerIdx = 10 + textureRequestIdx; // Bundle images start at samplerID 10.
+    if (textureRequestIdx < 0) {
+      samplerIdx = textureRequestIdx; // Keep loading/error indexes.
+    } else if (this.textureBundleIDs.length >= this.shaderInfo.uniforms.bundleSamplers.length) {
+      console.warn("Maximum number of image bundles exceeded. Increase supported amount in code?");
+      samplerIdx = -2; // Show images out of sampler count budget as visible problems with the error texture.
+    }
+
+    // Add the image command.
+    this.addImageInternal(left, top, width, height, 10 + samplerIdx, slice, cornerWidth, alpha);
   }
 
   // Internal functions to write data to the command buffers.
 
-  // Private. Add the given texture ID to the list of textures that will be used this frame.
-  pushTextureID(textureID, texturesToDraw, samplersList, fallbackTextureID, limitExceededMsg): number {
-    let samplerIdx = 0;
+  // Private. Add the given texture ID to the list of textures that will be used this frame, return its index.
+  pushTextureID(textureID: WebGLTexture, texturesToDraw: WebGLTexture[]): number {
     const idx = texturesToDraw.indexOf(textureID);
     if (idx === -1) {
-      // This texture was not requested yet. Add it to the bind list.
-
-      if (texturesToDraw.length >= samplersList.length) {
-        // Bail out. Do not try to render an image that can't be bound to the shader.
-        console.warn(limitExceededMsg);
-        return;
-      }
-      if (textureID == null || this.loadingTextureIDs.indexOf(textureID) !== -1) {
-        // The requested texture is invalid (not created or populated yet). Fallback to the default one.
-        const fallbackTexIdx = texturesToDraw.indexOf(fallbackTextureID);
-        samplerIdx += (fallbackTexIdx === -1) ? texturesToDraw.push(fallbackTextureID) - 1 : fallbackTexIdx;
+      // This texture was not requested yet.
+      if (textureID == null) {
+        // The requested texture is invalid (not created?).
+        // Don't push a new used texture to the bind list, we should fall back to the error one instead.
+        return -2;
+      } else if (this.loadingTextureIDs.indexOf(textureID) !== -1) {
+        // The requested texture is still loading.
+        // Don't push a new used texture to the bind list, we should fall back to the default one instead.
+        return -1;
       } else {
-        samplerIdx += texturesToDraw.push(textureID) - 1;
+        // Valid texture which hasn't been requested for this frame yet. Add it to the bind list.
+        return texturesToDraw.push(textureID) - 1;
       }
     } else {
       // This texture was already requested.
-      samplerIdx += idx;
+      return idx;
     }
-
-    return samplerIdx;
   }
 
   // Private. Helper function to add an image command, either bundled or standalone.
-  addImageInternal(left: number, top: number, width, height, samplerIdx, slice, cornerWidth: number, alpha): void {
+  addImageInternal(left: number, top: number, width: number, height: number, samplerIdx: number, slice: number, cornerWidth: number, alpha: number): void {
     const bounds = new Rect(left, top, width, height);
     if (this.addPrimitiveShape(CMD.IMAGE, bounds, [1.0, 1.0, 1.0, alpha], null, cornerWidth)) {
       let w = this.cmdDataIdx;
@@ -516,7 +532,7 @@ class UIRenderer {
         const tile_idx = y * this.num_tiles_x + x;
         const num_tile_cmds = ++this.cmdsPerTile[tile_idx][0];
         if (num_tile_cmds > MAX_CMDS_PER_TILE - 2) {
-          console.log("Too many shapes in a single tile");
+          console.warn("Too many shapes in a single tile");
         }
         this.cmdsPerTile[tile_idx][num_tile_cmds] = w / 4;
       }
@@ -561,6 +577,7 @@ class UIRenderer {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
+      // Remove texture ID from the set known to be loading.
       const idx = loadingTextureIDs.indexOf(textureID);
       if (idx > -1) { loadingTextureIDs.splice(idx, 1); }
 
@@ -850,10 +867,11 @@ class UIRenderer {
 
     // Create default fallback textures.
     {
-      // Create 1px textures to use as fallback while the real textures are loading
-      // asynchronously and for unused shader sampler binding points.
+      // Create 1px textures to use as fallback for unused shader sampler binding points.
+      // These textures should never show. If they do, we are using an unused shader sampler?
       gl.activeTexture(gl.TEXTURE0);
-      const pixel_data = new Uint8Array([80, 80, 80, 210]); // Single grey pixel.
+      const pixel_data = new Uint8Array([0, 180, 20, 210]); // Single green pixel.
+
       // 2D texture.
       this.fallback2DTextureID = gl.createTexture(); // Generate texture object ID.
       gl.bindTexture(gl.TEXTURE_2D, this.fallback2DTextureID); // Create texture object with ID.
@@ -864,7 +882,8 @@ class UIRenderer {
       gl.texSubImage2D(gl.TEXTURE_2D, 0, // Transfer data
         0, 0, 1, 1, // x,y offsets, width, height.
         gl.RGBA, gl.UNSIGNED_BYTE, // Source format and type.
-          pixel_data); // Single grey pixel.
+        pixel_data); // Single green pixel.
+
       // 2D array texture ("bundle").
       this.fallbackArrayTextureID = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.fallbackArrayTextureID);

@@ -69,7 +69,9 @@ uint get_tile_cmd_range_start(int tile_idx) {
 }
 
 vec4 sample_texture(int sampler_ID, vec2 tex_coord, float slice) {
-  if      (sampler_ID == 5) return texture(sampler0, tex_coord);
+  if      (sampler_ID == -2) return vec4(0.3, 0.3, 0.3, 0.8); // Grey fallback texture while images are still loading.
+  else if (sampler_ID == -1) return vec4(0.7, 0.0, 0.3, 0.9); // Pink error texture for visibility when something went wrong.
+  else if (sampler_ID == 5) return texture(sampler0, tex_coord);
   else if (sampler_ID == 6) return texture(sampler1, tex_coord);
   else if (sampler_ID == 7) return texture(sampler2, tex_coord);
   else if (sampler_ID == 8) return texture(sampler3, tex_coord);
@@ -77,7 +79,7 @@ vec4 sample_texture(int sampler_ID, vec2 tex_coord, float slice) {
   else if (sampler_ID == 10) return texture(bundle_sampler0, vec3(tex_coord.x, tex_coord.y, slice));
   else if (sampler_ID == 11) return texture(bundle_sampler1, vec3(tex_coord.x, tex_coord.y, slice));
   else if (sampler_ID == 12) return texture(bundle_sampler2, vec3(tex_coord.x, tex_coord.y, slice));
-  return texture(sampler0, tex_coord);
+  return vec4(0.8, 0.0, 0.3, 0.9); // Visibly show attempted usage of unknown sampler_ID.
 }
 
 // SDF functions for parametric shapes
