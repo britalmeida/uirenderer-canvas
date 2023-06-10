@@ -1,6 +1,6 @@
 {
   "name": "uirenderer-canvas",
-  "version": "1.0.7-beta.2",
+  "version": "1.0.7-beta.3",
   "description": "Minimal 2D UI system for the Web",
   "main": "index.js",
   "scripts": {
