@@ -348,7 +348,7 @@ class UIRenderer {
     }
 
     // Add the image command.
-    this.addImageInternal(left, top, width, height, 10 + samplerIdx, slice, cornerWidth, alpha);
+    this.addImageInternal(left, top, width, height, samplerIdx, slice, cornerWidth, alpha);
   }
 
   // Internal functions to write data to the command buffers.
