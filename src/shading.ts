@@ -159,7 +159,7 @@ const TILE_CMDS_BUFFER_LINE = 128;
 
 class UIRenderer {
   // Rendering context
-  private gl: WebGL2RenderingContext = null;
+  private gl: WebGL2RenderingContext;
 
   // Callback to trigger a redraw of the view component using this renderer.
   private readonly redrawCallback: Function;
@@ -198,11 +198,6 @@ class UIRenderer {
   private stateCorner = 0.0;
   private stateChanges = 0;
 
-
-  constructor(canvas: HTMLCanvasElement, redrawCallback: Function) {
-    this.redrawCallback = redrawCallback;
-    this.init(canvas);
-  }
 
   // Add Primitives.
 
@@ -825,45 +820,49 @@ class UIRenderer {
   }
 
   // Initialize the renderer: compile the shader and setup static data.
-  init(canvas: HTMLCanvasElement): void {
+  constructor(canvas: HTMLCanvasElement, redrawCallback: Function) {
+    this.redrawCallback = redrawCallback;
 
     // Initialize the GL context.
     const gl = canvas.getContext('webgl2');
     if (!gl) {
       // Only continue if WebGL is available and working.
       alert('Unable to initialize WebGL. Your browser may not support WebGL2.');
-      return;
+      throw new Error("UIRenderer failed to get WebGL 2 context");
     }
     this.gl = gl;
 
 
 
     // Load the shader code onto the GPU and compile shaders.
-    const shaderProgram = init_shader_program(gl, vs_source, fs_source);
+    const shaderProgram = initShaderProgram(gl, vs_source, fs_source);
+    if (shaderProgram === null) {
+      throw new Error("UIRenderer failed to initialize shader");
+    }
 
     // Collect the shader's attribute locations.
     this.shaderInfo = {
       program: shaderProgram,
       attrs: {
-        vertexPos: bind_attr(gl, shaderProgram, 'v_pos'),
+        vertexPos: bindAttr(gl, shaderProgram, 'v_pos'),
       },
       uniforms: {
-        vpSize: bind_uniform(gl, shaderProgram, 'viewport_size'),
-        cmdBufferTex: bind_uniform(gl, shaderProgram, 'cmd_data'),
-        tileCmdRangesBufferTex: bind_uniform(gl, shaderProgram, 'tile_cmd_ranges'),
-        tileCmdsBufferTex: bind_uniform(gl, shaderProgram, 'tile_cmds'),
-        textGlyphSampler: bind_uniform(gl, shaderProgram, 'text_glyph_sampler'),
+        vpSize: bindUniform(gl, shaderProgram, 'viewport_sze'),
+        cmdBufferTex: bindUniform(gl, shaderProgram, 'cmd_data'),
+        tileCmdRangesBufferTex: bindUniform(gl, shaderProgram, 'tile_cmd_ranges'),
+        tileCmdsBufferTex: bindUniform(gl, shaderProgram, 'tile_cmds'),
+        textGlyphSampler: bindUniform(gl, shaderProgram, 'text_glyph_sampler'),
         samplers: [
-          bind_uniform(gl, shaderProgram, 'sampler0'),
-          bind_uniform(gl, shaderProgram, 'sampler1'),
-          bind_uniform(gl, shaderProgram, 'sampler2'),
-          bind_uniform(gl, shaderProgram, 'sampler3'),
-          bind_uniform(gl, shaderProgram, 'sampler4'),
+          bindUniform(gl, shaderProgram, 'sampler0'),
+          bindUniform(gl, shaderProgram, 'sampler1'),
+          bindUniform(gl, shaderProgram, 'sampler2'),
+          bindUniform(gl, shaderProgram, 'sampler3'),
+          bindUniform(gl, shaderProgram, 'sampler4'),
         ],
         bundleSamplers : [
-          bind_uniform(gl, shaderProgram, 'bundle_sampler0'),
-          bind_uniform(gl, shaderProgram, 'bundle_sampler1'),
-          bind_uniform(gl, shaderProgram, 'bundle_sampler2'),
+          bindUniform(gl, shaderProgram, 'bundle_sampler0'),
+          bindUniform(gl, shaderProgram, 'bundle_sampler1'),
+          bindUniform(gl, shaderProgram, 'bundle_sampler2'),
         ],
       },
       uniformBlocks: {
@@ -953,7 +952,7 @@ class UIRenderer {
 }
 
 
-function disableMipMapping(gl) {
+function disableMipMapping(gl: WebGL2RenderingContext) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -961,38 +960,40 @@ function disableMipMapping(gl) {
 }
 
 // Get the shader location of an attribute of a shader by name.
-function bind_attr(gl, program, attr_name): GLint {
-  const attr_idx = gl.getAttribLocation(program, attr_name);
+function bindAttr(gl: WebGL2RenderingContext, program: WebGLProgram, attrName: string): GLint {
+  const attr_idx = gl.getAttribLocation(program, attrName);
   if (attr_idx === -1)
-    console.error("Can not bind attribute '", attr_name, "' for shader.");
+    throw new Error("UIRenderer: Can not bind attribute '" + attrName + "'. Misspelled in renderer or shader code?");
   return attr_idx;
 }
 
 
 // Get the shader location of an uniform of a shader by name.
-function bind_uniform(gl, program, attr_name): GLint {
-  const loc = gl.getUniformLocation(program, attr_name);
+function bindUniform(gl: WebGL2RenderingContext, program: WebGLProgram, attrName: string): WebGLUniformLocation {
+  const loc = gl.getUniformLocation(program, attrName);
   if (loc === null)
-    console.error("Can not bind uniform '", attr_name, "' for shader.");
+    throw new Error("UIRenderer: Can not bind uniform '" + attrName + "'. Misspelled in renderer or shader code?");
   return loc;
 }
 
 
 // Initialize a shader program with th given vertex and fragment shader source code.
-function init_shader_program(gl, vs_source, fs_source): WebGLProgram | null {
+function initShaderProgram(gl: WebGL2RenderingContext, vs_source: string, fs_source: string): WebGLProgram | null {
 
-  const vs = load_shader(gl, gl.VERTEX_SHADER, vs_source);
-  const fs = load_shader(gl, gl.FRAGMENT_SHADER, fs_source);
+  const vs = loadShader(gl, gl.VERTEX_SHADER, vs_source);
+  const fs = loadShader(gl, gl.FRAGMENT_SHADER, fs_source);
+  if (vs === null || fs === null)
+    return null;
 
   // Create the shader program
-  const program = gl.createProgram();
+  const program = gl.createProgram() as WebGLProgram;
   gl.attachShader(program, vs);
   gl.attachShader(program, fs);
   gl.linkProgram(program);
 
   // Check for failure
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    console.error('An error occurred compiling a shader program: ' + gl.getProgramInfoLog(program));
+    console.error('UIRenderer: An error occurred compiling a shader program: ' + gl.getProgramInfoLog(program));
     gl.deleteProgram(program);
     return null;
   }
@@ -1002,9 +1003,9 @@ function init_shader_program(gl, vs_source, fs_source): WebGLProgram | null {
 
 
 // Creates a shader of the given type with the given source code and compiles it.
-function load_shader(gl, shader_type, source_code) {
+function loadShader(gl: WebGL2RenderingContext, shader_type: GLenum, source_code: string): WebGLShader | null {
 
-  const shader = gl.createShader(shader_type);
+  const shader = gl.createShader(shader_type) as WebGLShader;
 
   //console.log("Compiling", (shader_type===gl.VERTEX_SHADER)? "Vertex" : "Fragment", "Shader...");
 
@@ -1013,7 +1014,7 @@ function load_shader(gl, shader_type, source_code) {
 
   // See if it compiled successfully
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    console.error('An error occurred compiling a shader: ' + gl.getShaderInfoLog(shader));
+    console.error('UIRenderer: An error occurred compiling a shader: ' + gl.getShaderInfoLog(shader));
     gl.deleteShader(shader);
     return null;
   }
