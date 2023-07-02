@@ -1,10 +1,31 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
+    "target": "ES2022",
+
+    /* Emit */
     "declarationDir": "./types",
     "declaration": true,
     "declarationMap": true,
     "emitDeclarationOnly": true,
+
+    /* Type Checking */
+    //"strict": true, // Enable and replace individual strict checks below. When working :)
+    "alwaysStrict": true,
+
+    "strictBindCallApply": true,
+    "strictFunctionTypes": true,
+    //"strictNullChecks": true, // Enable when code is fixed accordingly.
+    //"exactOptionalPropertyTypes": true, // Depends on strictNullChecks.
+    //"strictPropertyInitialization": true, // Depends on strictNullChecks.
+    
+    //"noImplicitAny": true, // Enable when code is fixed accordingly.
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
   },
   "include": [
     "lib/*",

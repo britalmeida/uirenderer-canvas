@@ -284,7 +284,7 @@ class UIRenderer {
     this.addFrame(bounds.left, bounds.top, bounds.width, bounds.height, lineWidth, color, radius);
   }
 
-  addText(text, p1: vec2, size: number, color: vec4): void {
+  addText(text: string, p1: vec2, size: number, color: vec4): void {
     const monoCharWidth = size;
     let advance = 0;
     const map = ['!','"','#','$','%','&','\'','(',')','*','+',',','-','.','/','0','1','2','3','4','5','6','7','8','9',':',';','<','=','>','?','@','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','[','\\',']','^','_','`','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','{','|','}','~',' '];
@@ -305,7 +305,7 @@ class UIRenderer {
     }
   }
 
-  addGlyph(glyphX: number, glyphY: number, bounds): void {
+  addGlyph(glyphX: number, glyphY: number, bounds: Rect): void {
 
     // Skip the bounds clipping and color/style pushing. It should have been done on the calling side.
 
@@ -396,7 +396,7 @@ class UIRenderer {
 
   // Private. Write the given shape to the global command buffer and add it to the tiles with which it overlaps.
   // Returns false if it was unable to allocate the command.
-  writeCmdToTiles(cmdType, bounds): boolean {
+  writeCmdToTiles(cmdType: CMD, bounds: Rect): boolean {
 
     // Get the w(rite) index for the global command buffer.
     let w = this.cmdDataIdx;
@@ -476,7 +476,7 @@ class UIRenderer {
   }
 
   // Private. Write the given shape and its style to the command buffers, if it is in the current view.
-  addPrimitiveShape(cmdType, bounds, color: vec4, lineWidth, corner): boolean {
+  addPrimitiveShape(cmdType: CMD, bounds: Rect, color: vec4, lineWidth: number, corner: number): boolean {
 
     // Pan and zoom the shape positioning according to the current view.
     const v = this.getView();
@@ -498,7 +498,7 @@ class UIRenderer {
 
   // Private. Write the given shape and its style to the command buffers, if it is in the current view.
   // As this is text, pan the text with the view, but keep it fixed size.
-  addPrimitiveGlyph(left: number, top: number, advance, width, height, color: vec4): boolean {
+  addPrimitiveGlyph(left: number, top: number, advance: number, width: number, height: number, color: vec4): boolean {
 
     // Pan the glyph according to the current view so that it moves,
     // but it keeps a fixed size instead of responding to zoom.
@@ -519,7 +519,7 @@ class UIRenderer {
   }
 
   // Private. Add a clip command to the global command buffer.
-  addClipRect(left: number, top: number, right, bottom): boolean {
+  addClipRect(left: number, top: number, right: number, bottom: number): boolean {
     // Write clip rect information for the shader.
 
     // Get the w(rite) index for the global command buffer.
@@ -537,6 +537,7 @@ class UIRenderer {
         const num_tile_cmds = ++this.cmdsPerTile[tile_idx][0];
         if (num_tile_cmds > MAX_CMDS_PER_TILE - 2) {
           console.warn("Too many shapes in a single tile");
+          return false;
         }
         this.cmdsPerTile[tile_idx][num_tile_cmds] = w / 4;
       }
@@ -551,13 +552,15 @@ class UIRenderer {
     this.cmdData[w++] = right;
     this.cmdData[w++] = bottom;
     this.cmdDataIdx = w;
+
+    return true;
   }
 
   // Image loading from a URL to a GPU texture.
 
   // Create a GPU texture object (returns the ID, usable immediately) and
   // asynchronously load the image data from the given url onto it.
-  loadImage(url): WebGLTexture {
+  loadImage(url: string): WebGLTexture {
     const gl = this.gl;
     const redrawCallback = this.redrawCallback;
     const loadingTextureIDs = this.loadingTextureIDs;
@@ -596,7 +599,7 @@ class UIRenderer {
   // Create a GPU texture object (returns the ID, usable immediately) and asynchronously load
   // the image data from all the given urls as slices. All images must have the same resolution
   // and can be indexed later in the order they were given.
-  loadImageBundle(urls, resolution): WebGLTexture {
+  loadImageBundle(urls: string[], resolution: vec2): WebGLTexture {
     const gl = this.gl;
     const redrawCallback = this.redrawCallback;
     let loadedSlices = 0;
