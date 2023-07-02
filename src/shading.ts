@@ -173,9 +173,9 @@ class UIRenderer {
   private buffers;
   private cmdData = new Float32Array(MAX_CMD_DATA * 4); // Pre-allocate commands of 4 floats (128 width).
   private cmdDataIdx = 0;
-  private glyphCacheTextureID:    WebGLTexture = null;
-  private fallback2DTextureID:    WebGLTexture = null;
-  private fallbackArrayTextureID: WebGLTexture = null;
+  private glyphCacheTextureID:    WebGLTexture;
+  private fallback2DTextureID:    WebGLTexture;
+  private fallbackArrayTextureID: WebGLTexture;
   private textureIDs:             WebGLTexture[] = [];
   private textureBundleIDs:       WebGLTexture[] = [];
   private loadingTextureIDs:      WebGLTexture[] = [];
@@ -560,7 +560,7 @@ class UIRenderer {
     const redrawCallback = this.redrawCallback;
     const loadingTextureIDs = this.loadingTextureIDs;
 
-    const textureID = gl.createTexture(); // Generate texture object ID.
+    const textureID = gl.createTexture() as WebGLTexture; // Generate texture object ID.
     gl.bindTexture(gl.TEXTURE_2D, textureID); // Create texture object with ID.
     loadingTextureIDs.push(textureID);
 
@@ -602,7 +602,7 @@ class UIRenderer {
     // Create a texture object with the given resolution and a slice per given URL.
     // Use GPU memory of immutable size.
     console.log("Creating texture bundle (", resolution[0], "x", resolution[1], ") with", urls.length, "textures");
-    const textureID = gl.createTexture(); // Generate texture object ID.
+    const textureID = gl.createTexture() as WebGLTexture; // Generate texture object ID.
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, textureID); // Create texture object with ID.
     gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8, resolution[0], resolution[1], urls.length);
 
@@ -879,7 +879,7 @@ class UIRenderer {
       const pixel_data = new Uint8Array([0, 180, 20, 210]); // Single green pixel.
 
       // 2D texture.
-      this.fallback2DTextureID = gl.createTexture(); // Generate texture object ID.
+      this.fallback2DTextureID = gl.createTexture() as WebGLTexture; // Generate texture object ID.
       gl.bindTexture(gl.TEXTURE_2D, this.fallback2DTextureID); // Create texture object with ID.
       gl.texStorage2D(gl.TEXTURE_2D, // Allocate immutable storage.
         1, // Number of mip map levels.
@@ -891,7 +891,7 @@ class UIRenderer {
         pixel_data); // Single green pixel.
 
       // 2D array texture ("bundle").
-      this.fallbackArrayTextureID = gl.createTexture();
+      this.fallbackArrayTextureID = gl.createTexture() as WebGLTexture;
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.fallbackArrayTextureID);
       gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8,
         1, 1, 1); // Width, height, slices.

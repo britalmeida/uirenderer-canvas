@@ -9,15 +9,7 @@
     "emitDeclarationOnly": true,
 
     /* Type Checking */
-    //"strict": true, // Enable and replace individual strict checks below. When working :)
-    "alwaysStrict": true,
-
-    "strictBindCallApply": true,
-    "strictFunctionTypes": true,
-    //"strictNullChecks": true, // Enable when code is fixed accordingly.
-    //"exactOptionalPropertyTypes": true, // Depends on strictNullChecks.
-    //"strictPropertyInitialization": true, // Depends on strictNullChecks.
-    
+    "strict": true,
     "noImplicitAny": true,
     "noImplicitOverride": true,
     "noImplicitReturns": true,
