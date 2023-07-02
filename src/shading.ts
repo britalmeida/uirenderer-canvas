@@ -847,7 +847,7 @@ class UIRenderer {
         vertexPos: bindAttr(gl, shaderProgram, 'v_pos'),
       },
       uniforms: {
-        vpSize: bindUniform(gl, shaderProgram, 'viewport_sze'),
+        vpSize: bindUniform(gl, shaderProgram, 'viewport_size'),
         cmdBufferTex: bindUniform(gl, shaderProgram, 'cmd_data'),
         tileCmdRangesBufferTex: bindUniform(gl, shaderProgram, 'tile_cmd_ranges'),
         tileCmdsBufferTex: bindUniform(gl, shaderProgram, 'tile_cmds'),
