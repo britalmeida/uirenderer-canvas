@@ -18,7 +18,7 @@
     //"exactOptionalPropertyTypes": true, // Depends on strictNullChecks.
     //"strictPropertyInitialization": true, // Depends on strictNullChecks.
     
-    //"noImplicitAny": true, // Enable when code is fixed accordingly.
+    "noImplicitAny": true,
     "noImplicitOverride": true,
     "noImplicitReturns": true,
     "noImplicitThis": true,

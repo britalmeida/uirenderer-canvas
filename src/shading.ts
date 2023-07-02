@@ -203,7 +203,7 @@ class UIRenderer {
 
   addRect(left: number, top: number, width: number, height: number, color: vec4, cornerWidth: number = 0): void {
     const bounds = new Rect(left, top, width, height);
-    this.addPrimitiveShape(CMD.RECT, bounds, color, null, cornerWidth);
+    this.addPrimitiveShape(CMD.RECT, bounds, color, 0, cornerWidth);
   }
 
   addFrame(left: number, top: number, width: number, height: number, lineWidth: number, color: vec4, cornerWidth: number = 0): void {
@@ -215,7 +215,7 @@ class UIRenderer {
     let bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.encapsulate(p2);
     bounds.widen(Math.round(width * 0.5 + 0.01));
-    if (this.addPrimitiveShape(CMD.LINE, bounds, color, width, null)) {
+    if (this.addPrimitiveShape(CMD.LINE, bounds, color, width, 0)) {
       let w = this.cmdDataIdx;
       const v = this.getView();
       // Data 2 - Shape parameters
@@ -233,7 +233,7 @@ class UIRenderer {
     bounds.encapsulate(p2);
     bounds.encapsulate(p3);
     bounds.encapsulate(p4);
-    if (this.addPrimitiveShape(CMD.QUAD, bounds, color, null, null)) {
+    if (this.addPrimitiveShape(CMD.QUAD, bounds, color, 0, 0)) {
       let w = this.cmdDataIdx;
       const v = this.getView();
       // Data 2 - Shape parameters
@@ -378,7 +378,7 @@ class UIRenderer {
   // Private. Helper function to add an image command, either bundled or standalone.
   addImageInternal(left: number, top: number, width: number, height: number, samplerIdx: number, slice: number, cornerWidth: number, alpha: number): void {
     const bounds = new Rect(left, top, width, height);
-    if (this.addPrimitiveShape(CMD.IMAGE, bounds, [1.0, 1.0, 1.0, alpha], null, cornerWidth)) {
+    if (this.addPrimitiveShape(CMD.IMAGE, bounds, [1.0, 1.0, 1.0, alpha], 0, cornerWidth)) {
       let w = this.cmdDataIdx;
       // Data 2 - Shape parameters
       this.cmdData[w++] = samplerIdx;
@@ -1023,4 +1023,5 @@ function loadShader(gl: WebGL2RenderingContext, shader_type: GLenum, source_code
 }
 
 
-export { vec2, vec4, Rect, View, UIRenderer }
+export { Rect, View, UIRenderer };
+export type { vec2, vec4 };
