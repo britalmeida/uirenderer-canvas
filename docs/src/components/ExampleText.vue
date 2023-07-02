@@ -9,7 +9,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { UIRenderer, TextStyle, TextBox } from "../../../index";
+import { vec4, UIRenderer, TextStyle, TextBox } from "../../../index";
 
 let uiRenderer: UIRenderer = null;
 const canvas = ref(null);
@@ -18,7 +18,7 @@ function draw() {
   const ui = uiRenderer;
   ui.beginFrame();
 
-  const color = [0.5, 0.7, 0.5, 1.0];
+  const color: vec4 = [0.5, 0.7, 0.5, 1.0];
   const textStyle = new TextStyle(15, color);
 
   ui.addText("A", [0, 0], 240, color);

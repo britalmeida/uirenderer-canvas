@@ -23,11 +23,11 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { UIRenderer, UILayout } from '../../../index';
+import { vec2, UIRenderer, UILayout } from '../../../index';
 
 let uiRenderer: UIRenderer = null;
 let imgBundleID: WebGLTexture | null = null;
-let thumbSize = [100, 100];
+let thumbSize: vec2 = [100, 100];
 let thumbnails: UILayout.ThumbnailImage[] = [];
 const canvas = ref(null);
 

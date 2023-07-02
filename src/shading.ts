@@ -59,7 +59,7 @@ class Rect {
     this.bottom = this.top + this.height;
   }
 
-  encapsulate(point: [number, number]): void {
+  encapsulate(point: vec2): void {
     this.left = Math.min(this.left, point[0]);
     this.right = Math.max(this.right, point[0]);
     this.top = Math.min(this.top, point[1]);
@@ -83,7 +83,7 @@ class View extends Rect {
   offsetY: number;
 
   constructor(x: number, y: number, w: number, h: number,
-              scale: [number, number], offset: [number, number]) {
+              scale: vec2, offset: vec2) {
     super(x, y, w, h);
     this.scaleX = scale[0];
     this.scaleY = scale[1];
@@ -1023,4 +1023,4 @@ function loadShader(gl: WebGL2RenderingContext, shader_type: GLenum, source_code
 }
 
 
-export { Rect, View, UIRenderer }
+export { vec2, vec4, Rect, View, UIRenderer }

@@ -10,7 +10,7 @@ div(classname="example-container")
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { UIRenderer } from '../../../index';
+import { vec4, UIRenderer } from '../../../index';
 
 let uiRenderer: UIRenderer = null;
 const canvas = ref(null);
@@ -18,7 +18,7 @@ const canvas = ref(null);
 function draw() {
   const ui = uiRenderer;
   ui.beginFrame();
-  const color = [0.5, 0.7, 0.5, 1.0];
+  const color: vec4 = [0.5, 0.7, 0.5, 1.0];
   ui.addRect(80, 10, 300, 20, color, 5);
   ui.addRect(20, 40, 450, 20, color, 5);
   ui.addRect(40, 70, 180, 20, color, 5);

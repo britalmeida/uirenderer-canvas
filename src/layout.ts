@@ -1,9 +1,9 @@
-import { Rect } from './shading';
+import { vec2, vec4, Rect } from './shading';
 
 // Set the position of the given thumbnails in a centered grid. Returns thumbnail size.
 function fitThumbsInGrid(thumbs: ThumbnailImage[],
-                         originalImageSize: [number, number],
-                         uiConfig: { totalSpacing: [number, number]; minMargin: number },
+                         originalImageSize: vec2,
+                         uiConfig: { totalSpacing: vec2; minMargin: number },
                          rect: Rect) {
 
   const numImages = thumbs.length;
@@ -27,7 +27,7 @@ function fitThumbsInGrid(thumbs: ThumbnailImage[],
   //console.log("Image a.ratio=", originalImageW / originalImageH, "(", originalImageW, "x", originalImageH,")");
 
   // Calculate maximum limit for thumbnail size.
-  let maxThumbSize = numImages === 1 ?
+  let maxThumbSize: vec2 = numImages === 1 ?
     [totalAvailableW - minMargin, totalAvailableH - minMargin]
     : [availableW, availableH];
 
@@ -41,7 +41,7 @@ function fitThumbsInGrid(thumbs: ThumbnailImage[],
   let scaleFactor = Math.sqrt(thumbnailArea / (originalImageW * originalImageH));
   //console.log("Scale factor:", scaleFactor);
 
-  let thumbnailSize = [originalImageW * scaleFactor, originalImageH * scaleFactor];
+  let thumbnailSize: vec2 = [originalImageW * scaleFactor, originalImageH * scaleFactor];
 
   const numImagesPerRow = Math.ceil(availableW / thumbnailSize[0]);
   const numImagesPerCol = Math.ceil(numImages / numImagesPerRow);
@@ -65,8 +65,8 @@ function fitThumbsInGrid(thumbs: ThumbnailImage[],
   //console.log("Y");
   const spaceH = calculateSpacingCentered(totalAvailableH, thumbnailSize[1], numImagesPerCol, minMargin);
 
-  const margins = [spaceW[0], spaceH[0]];
-  const spacing = [spaceW[1], spaceH[1]];
+  const margins: vec2 = [spaceW[0], spaceH[0]];
+  const spacing: vec2 = [spaceW[1], spaceH[1]];
 
   // Set the position of each thumbnail.
   let startPosX = margins[0];
@@ -89,28 +89,29 @@ function fitThumbsInGrid(thumbs: ThumbnailImage[],
 }
 
 // Set the position of the given thumbnails and groups. Flows from top-left. Returns thumbnail size.
-function fitThumbsInGroup(summaryText,
-                          groups,
+function fitThumbsInGroup(summaryText: { str: string, pos: vec2 },
+                          groups: ThumbnailGroup[],
                           thumbs: ThumbnailImage[],
-                          originalImageSize: [number, number],
+                          originalImageSize: vec2,
                           uiConfig: { fontSize: number, minMargin: number,
                                       groupedView: {summaryText: { spaceBefore: number, spaceAfter: number },
                                                     groupTitle: { spaceBefore: number, spaceAfter: number },
                                                     colorRect: { width: number, xOffset: number } }},
-                          rect: Rect) {
+                          rect: Rect) : vec2 {
 
   const numGroups = groups.length;
   //console.log("Assigned", thumbs.length, "thumbnails to", numGroups, "groups");
-  if (numGroups === 0) { return; }
+  if (numGroups === 0) { return [0, 0]; }
 
   // Find the maximum scale at which the thumbnails can be displayed.
 
   // Get the distribution of thumbnails per group, sorted, with highest first.
-  let thumbsPerGroup = [];
+  let thumbsPerGroup: number[] = [];
   for (const group of groups) {
     thumbsPerGroup.push(group.thumbIdxs.length);
   }
   thumbsPerGroup.sort((a, b) => b - a);
+  const maxNumThumbsFoundInGroup: number = thumbsPerGroup[0]!;
   //console.log(thumbsPerGroup);
 
   // Get size of the region containing the thumbnails.
@@ -142,7 +143,7 @@ function fitThumbsInGroup(summaryText,
 
   // Thumbnail images are at their biggest possible size when each group has a single row.
   // Find maximum height and corresponding scale.
-  let numImagesPerRow = thumbsPerGroup[0];
+  let numImagesPerRow = maxNumThumbsFoundInGroup;
   let numImagesPerCol = numGroups;
   const heightFitFactor = getFitFactor(availableH, numImagesPerCol, originalImageH);
   // Find a thumbnail width that is guaranteed to fit with all the group's thumbnails in one row.
@@ -157,7 +158,7 @@ function fitThumbsInGroup(summaryText,
     // Otherwise, do a linear search for the number of columns that maximizes the thumb size.
     // A binary search may fall into a local maximum.
     scaleFactor = Math.min(upscaleLimit, rowFitFactor);
-    for (let numCols = thumbsPerGroup[0]; numCols > 0; numCols--) {
+    for (let numCols = maxNumThumbsFoundInGroup; numCols > 0; numCols--) {
       // Calculate resulting number of rows, if there are "cols" number of columns.
       let numRows = 0;
       for (const n of thumbsPerGroup) {
@@ -181,7 +182,7 @@ function fitThumbsInGroup(summaryText,
     }
   }
 
-  const thumbSize = [originalImageW * scaleFactor, originalImageH * scaleFactor];
+  const thumbSize: vec2 = [originalImageW * scaleFactor, originalImageH * scaleFactor];
   //console.log("[", numImagesPerRow, "cols x", numImagesPerCol, "rows]. Scale factor:",
   // scaleFactor, "Thumb size:", thumbSize);
 
@@ -224,6 +225,10 @@ function fitThumbsInGroup(summaryText,
 
   // Set the position of each thumbnail.
   for (let thumb of thumbs) {
+    if (thumb.posInGroup < 0 || !thumb.group) {
+      console.warn("Attempting to layout thumbnails without group in group view.", thumb);
+      continue;
+    }
     const row = Math.floor(thumb.posInGroup / numImagesPerRow);
     const col = thumb.posInGroup % numImagesPerRow;
     const groupY = thumb.group.namePos[1];
@@ -247,7 +252,7 @@ function getFitFactor(availableSpace: number, numThumbs: number, originalImageSi
 
 // Get the remaining space not occupied by thumbnails and split it into margins
 // and spacing between the thumbnails.
-function calculateSpacingCentered(totalAvailable: number, thumbSize: number, numThumbs: number, minMargin: number): [number, number] {
+function calculateSpacingCentered(totalAvailable: number, thumbSize: number, numThumbs: number, minMargin: number): vec2 {
 
   const availableSpace = totalAvailable - thumbSize * numThumbs;
   //console.log("remaining space", availableSpace, "px =", totalAvailable, "-", thumbSize, "*", numThumbs);
@@ -294,15 +299,15 @@ function calculateSpacingTopLeftFlow(usableSpace: number, thumbSize: number, num
 class ThumbnailImage {
 
   // Image display
-  pos = [0, 0]; // Position in px where the image should be displayed in canvas coordinates.
+  pos: vec2 = [0, 0]; // Position in px where the image should be displayed in canvas coordinates.
   // Represented object (shot/asset...)
-  obj; // Object that this thumbnail represents, such as a shot, asset or person..
-  objIdx; // Index in the array of objects.
+  obj: Object | null; // Object that this thumbnail represents, such as a shot, asset or person..
+  objIdx: number; // Index in the array of objects.
   // Grouped view
-  group = null; // Group that this thumbnail belongs to.
-  posInGroup = -1; // Relative position in the thumbnails of this group.
+  group: ThumbnailGroup | null = null; // Group that this thumbnail belongs to.
+  posInGroup: number = -1; // Relative position in the thumbnails of this group.
 
-  constructor(obj, objIdx) {
+  constructor(obj: Object | null, objIdx: number) {
     this.obj = obj;
     this.objIdx = objIdx;
   }
@@ -314,16 +319,16 @@ class ThumbnailGroup {
 
   // Group title
   name: string;
-  namePos = [0, 0]; // Position in px where the group name should be displayed in canvas coordinates.
+  namePos: vec2 = [0, 0]; // Position in px where the group name should be displayed in canvas coordinates.
   // Group color
-  color;
-  colorRect = [0, 0, 0, 0];
+  color: vec4;
+  colorRect: vec4 = [0, 0, 0, 0];
   // Contained thumbnails
-  thumbIdxs = []; // Index in the thumbnails array.
+  thumbIdxs: number[] = []; // Index in the thumbnails array.
   // Object that this group represents, e.g. a Sequence, a Task Status, or an Assignee.
-  criteriaObj: Object;
+  criteriaObj: Object | null;
 
-  constructor(displayStr: string = "", displayColor= [0.8, 0.0, 0.0, 1.0], criteriaObj: Object = null) {
+  constructor(displayStr: string = "", displayColor: vec4 = [0.8, 0.0, 0.0, 1.0], criteriaObj: Object | null = null) {
     this.name = displayStr;
     this.color = displayColor;
     this.criteriaObj = criteriaObj;

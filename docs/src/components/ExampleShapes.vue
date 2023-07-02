@@ -20,7 +20,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { UIRenderer } from '../../../index';
+import { vec4, UIRenderer } from '../../../index';
 
 let uiRenderer: UIRenderer = null;
 let canvas = ref(null);
@@ -29,7 +29,7 @@ function draw() {
   const ui = uiRenderer;
   ui.beginFrame();
 
-  const color = [0.5, 0.7, 0.5, 1.0];
+  const color: vec4 = [0.5, 0.7, 0.5, 1.0];
   ui.addRect(10, 10, 100, 100, color);
   ui.addCircle([170, 60], 50, color);
   ui.addLine([270, 15], [225, 105], 10, color)

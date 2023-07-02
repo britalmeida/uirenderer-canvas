@@ -1,4 +1,4 @@
-import {Rect, UIRenderer} from './shading';
+import { vec4, Rect, UIRenderer } from './shading';
 
 class TextStyle {
 
@@ -31,10 +31,10 @@ class TextStyle {
   size = 24;
   advance = 24 - 8;
   lineSpacing = 24 + 2;
-  color;
-  shadow = [0.0, 0.0, 0.0, 0.5];
+  color: vec4;
+  shadow: vec4 = [0.0, 0.0, 0.0, 0.5];
 
-  constructor(size: number, color = [0.86, 0.86, 0.86, 1.0]) {
+  constructor(size: number, color: vec4 = [0.86, 0.86, 0.86, 1.0]) {
     this.size = size;
     this.advance = size - size * 0.5;
     this.lineSpacing = size + 2.0;

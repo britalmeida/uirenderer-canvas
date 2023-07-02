@@ -25,11 +25,11 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { UIRenderer, UILayout } from '../../../index';
+import { vec2, vec4, UIRenderer, UILayout } from '../../../index';
 
 let uiRenderer: UIRenderer = null;
 let imgBundleID: WebGLTexture | null = null;
-let imgSourceResolution = [50, 50];
+let imgSourceResolution: vec2 = [50, 50];
 let thumbnails: UILayout.ThumbnailImage[] = [];
 const canvas = ref(null);
 
