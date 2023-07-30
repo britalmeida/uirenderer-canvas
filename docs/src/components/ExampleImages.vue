@@ -23,29 +23,29 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { vec2, UIRenderer, UILayout } from '../../../index';
+import { type vec2, UIRenderer, UILayout } from '../../../index';
 
-let uiRenderer: UIRenderer = null;
+let uiRenderer: UIRenderer | null = null;
 let imgBundleID: WebGLTexture | null = null;
 let thumbSize: vec2 = [100, 100];
 let thumbnails: UILayout.ThumbnailImage[] = [];
 const canvas = ref(null);
 
 function draw() {
-  const ui = uiRenderer;
+  const ui = uiRenderer!; // Guaranteed to exist, created onMount.
   ui.beginFrame();
   for (const thumb of thumbnails) {
-    ui.addImageFromBundle(thumb.pos[0], thumb.pos[1], thumbSize[0], thumbSize[1], imgBundleID, thumb.objIdx);
+    ui.addImageFromBundle(thumb.pos[0], thumb.pos[1], thumbSize[0], thumbSize[1], imgBundleID!, thumb.objIdx);
   }
   ui.draw();
 }
 
 onMounted(() => {
-  uiRenderer = new UIRenderer(canvas.value, draw);
+  uiRenderer = new UIRenderer(canvas.value!, draw);
   let thumbUrls = [];
-  for (let i = 0; i < 4; i++) { //starts loop
+  for (let i = 0; i < 4; i++) {
     let thumbnail = new UILayout.ThumbnailImage(null, i);
-    thumbnail.pos =  [(10 + 16 * i) + (i * 100), 10 ];
+    thumbnail.pos =  [10 + (i * (16 + thumbSize[0])) , 10 ];
     thumbnails.push(thumbnail);
   }
 

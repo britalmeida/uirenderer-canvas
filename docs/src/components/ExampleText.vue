@@ -9,13 +9,13 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { vec4, UIRenderer, TextStyle, TextBox } from "../../../index";
+import { type vec4, UIRenderer, TextStyle, TextBox } from "../../../index";
 
-let uiRenderer: UIRenderer = null;
+let uiRenderer: UIRenderer | null = null;
 const canvas = ref(null);
 
 function draw() {
-  const ui = uiRenderer;
+  const ui = uiRenderer!; // Guaranteed to exist, created onMount.
   ui.beginFrame();
 
   const color: vec4 = [0.5, 0.7, 0.5, 1.0];
@@ -62,7 +62,7 @@ function draw() {
 }
 
 onMounted(() => {
-  uiRenderer = new UIRenderer(canvas.value, draw);
+  uiRenderer = new UIRenderer(canvas.value!, draw);
   draw();
 })
 

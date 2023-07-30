@@ -196,7 +196,7 @@ class UIRenderer {
   private stateColor = [-1, -1, -1, -1];
   private stateLineWidth = 1.0;
   private stateCorner = 0.0;
-  private stateChanges = 0;
+  //private stateChanges = 0;
 
 
   // Add Primitives.
@@ -449,7 +449,7 @@ class UIRenderer {
       this.stateColor = color;
       this.stateLineWidth = lineWidth !== null ? lineWidth : 1.0;
       this.stateCorner = corner !== null ? corner : 0.0;
-      this.stateChanges++;
+      //this.stateChanges++;
 
       let sw = this.styleDataIdx;
       // Check for the required number of style data slots.
@@ -816,7 +816,7 @@ class UIRenderer {
     this.stateColor = [-1, -1, -1, -1];
     // Clear the style list.
     this.styleDataIdx = this.styleDataStartIdx;
-    this.stateChanges = 0;
+    //this.stateChanges = 0;
   }
 
   // Initialize the renderer: compile the shader and setup static data.

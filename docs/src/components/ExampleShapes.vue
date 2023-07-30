@@ -20,13 +20,13 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { vec4, UIRenderer } from '../../../index';
+import { type vec4, UIRenderer } from '../../../index';
 
-let uiRenderer: UIRenderer = null;
+let uiRenderer: UIRenderer | null = null;
 let canvas = ref(null);
 
 function draw() {
-  const ui = uiRenderer;
+  const ui = uiRenderer!; // Guaranteed to exist, created onMount.
   ui.beginFrame();
 
   const color: vec4 = [0.5, 0.7, 0.5, 1.0];
@@ -35,11 +35,12 @@ function draw() {
   ui.addLine([270, 15], [225, 105], 10, color)
   ui.addTriangle([295, 10], [245, 110], [345, 110], color)
   ui.addRect(360, 10, 100, 100, color, 10);
+
   ui.draw();
 }
 
 onMounted(() => {
-  uiRenderer = new UIRenderer(canvas.value, draw);
+  uiRenderer = new UIRenderer(canvas.value!, draw);
   draw();
-  })
+})
 </script>

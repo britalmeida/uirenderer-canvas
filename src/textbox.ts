@@ -1,4 +1,4 @@
-import { vec4, Rect, UIRenderer } from './shading';
+import { type vec4, Rect, UIRenderer } from './shading';
 
 class TextStyle {
 
@@ -106,6 +106,7 @@ class TextBox {
     if (textStyle.flow !== TextStyle.Flow.Crop) {
       for (const character of text) {
         // Glyph selection should influence the actual advance and kerning.
+        character; // WIP code: should check which glyph it is when supporting more than monospace.
         x += stepX;
 
         if (x + stepX > bounds.right) {
