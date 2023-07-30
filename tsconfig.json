@@ -20,7 +20,7 @@
     "noUnusedParameters": true,
   },
   "include": [
-    "lib/*",
+    "src/*",
     "index.ts"
   ]
 }

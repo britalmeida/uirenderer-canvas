@@ -21,6 +21,7 @@
     "@types/node": "^16.11.47",
     "@vitejs/plugin-vue": "^3.0.1",
     "@vue/eslint-config-typescript": "^11.0.0",
+    "@vue/language-plugin-pug": "^1.8.8",
     "@vue/tsconfig": "^0.1.3",
     "eslint": "8.22.0",
     "eslint-plugin-vue": "^9.3.0",
