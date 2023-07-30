@@ -1,10 +1,10 @@
-import { vec2, vec4, Rect } from './shading';
+import type { vec2, vec4 } from './shading';
 
 // Set the position of the given thumbnails in a centered grid. Returns thumbnail size.
 function fitThumbsInGrid(thumbs: ThumbnailImage[],
                          originalImageSize: vec2,
                          uiConfig: { totalSpacing: vec2; minMargin: number },
-                         rect: Rect) {
+                         rect: { width: number, height: number }) {
 
   const numImages = thumbs.length;
 
@@ -97,7 +97,7 @@ function fitThumbsInGroup(summaryText: { str: string, pos: vec2 },
                                       groupedView: {summaryText: { spaceBefore: number, spaceAfter: number },
                                                     groupTitle: { spaceBefore: number, spaceAfter: number },
                                                     colorRect: { width: number, xOffset: number } }},
-                          rect: Rect) : vec2 {
+                          rect: { width: number, height: number }) : vec2 {
 
   const numGroups = groups.length;
   //console.log("Assigned", thumbs.length, "thumbnails to", numGroups, "groups");
