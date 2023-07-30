@@ -8,11 +8,10 @@
     )
   pre.
     Canvas: 470x120
-    1. Create an array of UILayout.ThumbnailImage objects
-    2. Create an array of urls (for each UILayout.ThumbnailImage)
-    3. Create image bundle with uiRenderer.loadImageBundle
-    4. Call the draw method
-    5. This is the draw method:
+    1. Create an array of urls (strings)
+    2. Create image bundle with uiRenderer.loadImageBundle
+    3. Create an array of UILayout.ThumbnailImage objects to aid with layout positioning
+    4. Call the draw method with:
       const ui = this.uiRenderer;
       ui.beginFrame();
       for (const thumb of this.thumbnails) {
@@ -29,8 +28,8 @@ import { type vec2, UIRenderer, UILayout } from '../../../index';
 
 let uiRenderer: UIRenderer | null = null;
 let imgBundleID: WebGLTexture | null = null;
-let imgSourceResolution: vec2 = [50, 50];
-let thumbnails: UILayout.ThumbnailImage[] = [];
+const imgSourceResolution: vec2 = [50, 50];
+const thumbnails: UILayout.ThumbnailImage[] = [];
 const canvas = ref(null);
 
 const uiConfig = {
@@ -41,7 +40,7 @@ const uiConfig = {
 function draw() {
   // Determine where each thumbnail should draw at the maximum possible size for the currently available area
   const canvasRect = (canvas.value! as HTMLCanvasElement).getBoundingClientRect();
-  let thumbnailSize = UILayout.fitThumbsInGrid(thumbnails, imgSourceResolution, uiConfig, canvasRect);
+  const thumbnailSize = UILayout.fitThumbsInGrid(thumbnails, imgSourceResolution, uiConfig, canvasRect);
 
   const ui = uiRenderer!; // Guaranteed to exist, created onMount.
   ui.beginFrame();
@@ -54,10 +53,9 @@ function draw() {
 onMounted(() => {
   uiRenderer = new UIRenderer(canvas.value!, draw);
 
-  let thumbUrls = [];
-  for (let i = 0; i < 450; i++) { //starts loop
-    let thumbnail = new UILayout.ThumbnailImage(null, i);
-    thumbnails.push(thumbnail);
+  const thumbUrls = [];
+  for (let i = 0; i < 450; i++) {
+    thumbnails.push(new UILayout.ThumbnailImage(null, i));
   }
 
   for (const thumb of thumbnails) {
