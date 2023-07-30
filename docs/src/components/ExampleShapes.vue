@@ -23,7 +23,7 @@ import { onMounted, ref } from 'vue';
 import { type vec4, UIRenderer } from '../../../index';
 
 let uiRenderer: UIRenderer | null = null;
-let canvas = ref(null);
+const canvas = ref(null);
 
 function draw() {
   const ui = uiRenderer!; // Guaranteed to exist, created onMount.

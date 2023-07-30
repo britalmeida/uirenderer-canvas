@@ -24,11 +24,11 @@ function draw() {
   ui.addText("A", [0, 0], 240, color);
   ui.addText("Era uma vez um gato...", [200, 0], 14,color);
 
-  let x = 50;
+  const x = 50;
   let y = 50;
   new TextBox(ui, "Bla", x, y, 50, 20, textStyle);
 
-  let style1 = new TextStyle(15, color);
+  const style1 = new TextStyle(15, color);
   new TextBox(ui, "Lorem ipsum fox foxy dolor sick siiiiicko", 150, y, 70, 150, style1);
 
   style1.flow = TextStyle.Flow.Wrap;
