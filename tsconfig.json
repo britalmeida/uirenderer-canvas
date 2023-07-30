@@ -15,7 +15,7 @@
     "noImplicitReturns": true,
     "noImplicitThis": true,
     "noPropertyAccessFromIndexSignature": true,
-    "noUncheckedIndexedAccess": true,
+    "noUncheckedIndexedAccess": false, // Option triggers unexpected errors. See https://github.com/microsoft/TypeScript/issues/55206
     "noUnusedLocals": true,
     "noUnusedParameters": true,
   },
