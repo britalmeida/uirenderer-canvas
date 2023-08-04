@@ -1,46 +1,66 @@
-# Dispatch
+# UI Renderer Canvas - Getting Started
 
-This template should help get you started developing with Vue 3 in Vite.
+Demo code making use of UI Renderer - Canvas.  
+Examples are provided using Vue.js, but can be adapted to other web frameworks or static websites.
 
-## Recommended IDE Setup
+## No Framework
+
+## Vue.js
+
+### Recommended IDE Setup
+
+VSCode: enable following extensions:
+- slevesque.shader
+- Vue.volar
+- johnsoncodehk.vscode-typescript-vue-plugin (takeover mode)
+- dbaeumer.vscode-eslint
 
 [VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
 
-## Type Support for `.vue` Imports in TS
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin) to make the TypeScript language service aware of `.vue` types.
-
-If the standalone TypeScript plugin doesn't feel fast enough to you, Volar has also implemented a [Take Over Mode](https://github.com/johnsoncodehk/volar/discussions/471#discussioncomment-1361669) that is more performant. You can enable it by the following steps:
-
-1. Disable the built-in TypeScript Extension
-    1) Run `Extensions: Show Built-in Extensions` from VSCode's command palette
-    2) Find `TypeScript and JavaScript Language Features`, right click and select `Disable (Workspace)`
-2. Reload the VSCode window by running `Developer: Reload Window` from the command palette.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vitejs.dev/config/).
 
 ## Project Setup
 
 ```sh
-npm install
+yarn install
 ```
 
 ### Compile and Hot-Reload for Development
 
 ```sh
-npm run dev
+yarn run dev
 ```
 
 ### Type-Check, Compile and Minify for Production
 
 ```sh
-npm run build
+yarn run build
 ```
 
 ### Lint with [ESLint](https://eslint.org/)
 
 ```sh
-npm run lint
+yarn run lint
 ```
+
+## Contributing to UI Renderer - Canvas
+
+### Recommended IDE Setup
+
+### Building and Packaging
+VSCode: enable following extensions:
+- slevesque.shader
+- Vue.volar
+- johnsoncodehk.vscode-typescript-vue-plugin (takeover mode)
+- dbaeumer.vscode-eslint
+
+Currently, we configured `.tscofing.json` with the only purpose of building type declaration (`.d.ts`).
+This means that all the compiler flags are specified in `tsconfig.json` and the `build:types` command in `package.json` simply calls `tsc`.
+
+This command is also called everything we do publish with `npm publish`.
+
+
+### Publishing
+* Bump the version in `package.json`
+* Run `npm publish`
+* For beta: `npm publish --tag beta`

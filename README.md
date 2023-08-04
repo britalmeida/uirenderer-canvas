@@ -57,19 +57,6 @@ Special thanks to Michiel van der Leeuw for sharing ideas on this topic.
 - `docs` - code examples and development instructions
 
 
-### Building and Packaging
-Currently, we configured `.tscofing.json` with the only purpose of building type declaration (`.d.ts`).
-This means that all the compiler flags are specified in `tsconfig.json` and the `build:types` command in `package.json` simply calls `tsc`.
-
-This command is also called everything we do publish with `npm publish`.
-
-
-### Publishing
-* Bump the version in `package.json`
-* Run `npm publish`
-* For beta: `npm publish --tag beta`
-
-
 ## Support & Maintenance
 UI Renderer is originally developed by Inês Almeida with help from Francesco Siddi.
 It's an open source project, reach out if you have ideas, problems or feedback!

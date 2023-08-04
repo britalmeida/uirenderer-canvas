@@ -1,7 +1,5 @@
 // Load the vertex and fragment shader sources.
-// @ts-ignore
 import vs_source from '../glsl/vertex.glsl';
-// @ts-ignore
 import fs_source from '../glsl/fragment.glsl';
 
 import {fontInconsolataBlobUrl} from '../assets/blobs';
@@ -162,7 +160,7 @@ class UIRenderer {
   private gl: WebGL2RenderingContext;
 
   // Callback to trigger a redraw of the view component using this renderer.
-  private readonly redrawCallback: Function;
+  private readonly redrawCallback: () => void;
 
   // Viewport transform
   private views: View[] = [];
@@ -212,7 +210,7 @@ class UIRenderer {
   }
 
   addLine(p1: vec2, p2: vec2, width: number, color: vec4): void {
-    let bounds = new Rect(p1[0], p1[1], 0, 0);
+    const bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.encapsulate(p2);
     bounds.widen(Math.round(width * 0.5 + 0.01));
     if (this.addPrimitiveShape(CMD.LINE, bounds, color, width, 0)) {
@@ -229,7 +227,7 @@ class UIRenderer {
   }
 
   addQuad(p1: vec2, p2: vec2, p3: vec2, p4: vec2, color: vec4): void {
-    let bounds = new Rect(p1[0], p1[1], 0, 0);
+    const bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.encapsulate(p2);
     bounds.encapsulate(p3);
     bounds.encapsulate(p4);
@@ -267,14 +265,14 @@ class UIRenderer {
 
   addCircle(p1: vec2, radius: number, color: vec4): void {
     // A circle is a rectangle with very rounded corners.
-    let bounds = new Rect(p1[0], p1[1], 0, 0);
+    const bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.widen(radius);
     this.addRect(bounds.left, bounds.top, bounds.width, bounds.height, color, radius);
   }
 
   addCircleFrame(p1: vec2, radius: number, lineWidth: number, color: vec4): void {
     // A circle is a rectangle with very rounded corners.
-    let bounds = new Rect(p1[0], p1[1], 0, 0);
+    const bounds = new Rect(p1[0], p1[1], 0, 0);
     bounds.widen(radius);
     this.addFrame(bounds.left, bounds.top, bounds.width, bounds.height, lineWidth, color, radius);
   }
@@ -585,7 +583,7 @@ class UIRenderer {
 
       // Trigger a redraw of the component view that uses this renderer.
       redrawCallback();
-    }
+    };
 
     image.src = url;
     return textureID;
@@ -629,7 +627,7 @@ class UIRenderer {
         if (loadedSlices === urls.length) {
           redrawCallback();
         }
-      }
+      };
 
       image.src = urls[i];
     }
@@ -820,7 +818,7 @@ class UIRenderer {
   }
 
   // Initialize the renderer: compile the shader and setup static data.
-  constructor(canvas: HTMLCanvasElement, redrawCallback: Function) {
+  constructor(canvas: HTMLCanvasElement, redrawCallback: () => void) {
     this.redrawCallback = redrawCallback;
 
     // Initialize the GL context.

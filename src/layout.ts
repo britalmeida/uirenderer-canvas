@@ -27,7 +27,7 @@ function fitThumbsInGrid(thumbs: ThumbnailImage[],
   //console.log("Image a.ratio=", originalImageW / originalImageH, "(", originalImageW, "x", originalImageH,")");
 
   // Calculate maximum limit for thumbnail size.
-  let maxThumbSize: vec2 = numImages === 1 ?
+  const maxThumbSize: vec2 = numImages === 1 ?
     [totalAvailableW - minMargin, totalAvailableH - minMargin]
     : [availableW, availableH];
 
@@ -75,7 +75,7 @@ function fitThumbsInGrid(thumbs: ThumbnailImage[],
     margins[0] + (numImagesPerRow - 1) * (thumbnailSize[0] + spacing[0])
   );
 
-  for (let img of thumbs) {
+  for (const img of thumbs) {
     img.pos = [startPosX, startPosY];
     startPosX += thumbnailSize[0] + spacing[0];
     // Next row
@@ -106,7 +106,7 @@ function fitThumbsInGroup(summaryText: { str: string, pos: vec2 },
   // Find the maximum scale at which the thumbnails can be displayed.
 
   // Get the distribution of thumbnails per group, sorted, with highest first.
-  let thumbsPerGroup: number[] = [];
+  const thumbsPerGroup = [] as number[];
   for (const group of groups) {
     thumbsPerGroup.push(group.thumbIdxs.length);
   }
@@ -195,7 +195,7 @@ function fitThumbsInGroup(summaryText: { str: string, pos: vec2 },
 
   // Set the positions of the elements to be displayed.
 
-  let startPosX = minSideMargin + colorRectOffset;
+  const startPosX = minSideMargin + colorRectOffset;
   let titlePosY = minSideMargin + summaryHeight;
   const titleSize = uiConfig.fontSize + uiConfig.groupedView.groupTitle.spaceAfter;
   const thumbnailStepX = thumbSize[0] + spaceW;
@@ -224,7 +224,7 @@ function fitThumbsInGroup(summaryText: { str: string, pos: vec2 },
   }
 
   // Set the position of each thumbnail.
-  for (let thumb of thumbs) {
+  for (const thumb of thumbs) {
     if (thumb.posInGroup < 0 || !thumb.group) {
       console.warn("Attempting to layout thumbnails without group in group view.", thumb);
       continue;
@@ -301,13 +301,13 @@ class ThumbnailImage {
   // Image display
   pos: vec2 = [0, 0]; // Position in px where the image should be displayed in canvas coordinates.
   // Represented object (shot/asset...)
-  obj: Object | null; // Object that this thumbnail represents, such as a shot, asset or person..
+  obj: object | null; // Object that this thumbnail represents, such as a shot, asset or person..
   objIdx: number; // Index in the array of objects.
   // Grouped view
   group: ThumbnailGroup | null = null; // Group that this thumbnail belongs to.
   posInGroup: number = -1; // Relative position in the thumbnails of this group.
 
-  constructor(obj: Object | null, objIdx: number) {
+  constructor(obj: object | null, objIdx: number) {
     this.obj = obj;
     this.objIdx = objIdx;
   }
@@ -326,9 +326,9 @@ class ThumbnailGroup {
   // Contained thumbnails
   thumbIdxs: number[] = []; // Index in the thumbnails array.
   // Object that this group represents, e.g. a Sequence, a Task Status, or an Assignee.
-  criteriaObj: Object | null;
+  criteriaObj: object | null;
 
-  constructor(displayStr: string = "", displayColor: vec4 = [0.8, 0.0, 0.0, 1.0], criteriaObj: Object | null = null) {
+  constructor(displayStr: string = "", displayColor: vec4 = [0.8, 0.0, 0.0, 1.0], criteriaObj: object | null = null) {
     this.name = displayStr;
     this.color = displayColor;
     this.criteriaObj = criteriaObj;

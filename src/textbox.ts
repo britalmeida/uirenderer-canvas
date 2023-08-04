@@ -67,7 +67,7 @@ class TextBox {
     this.text = text;
 
 
-    let tb = this;
+    const tb = this;
     const fontSize = style.size;
     const textStyle = style;
 

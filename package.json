@@ -1,31 +1,50 @@
 {
   "name": "uirenderer-canvas",
   "version": "1.0.7-beta.4",
+
   "description": "Minimal 2D UI system for the Web",
-  "main": "index.js",
-  "scripts": {
-    "build:types": "tsc",
-    "prepublishOnly": "yarn run build:types"
-  },
+  "author": "Inês Almeida",
+  "license": "MIT",
+  "homepage": "https://github.com/britalmeida/uirenderer-canvas#readme",
+  "repository": { "type": "git", "url": "git+https://github.com/britalmeida/uirenderer-canvas.git" },
+  "bugs": { "url": "https://github.com/britalmeida/uirenderer-canvas/issues" },
+
+  "main": "index.ts",
   "files": [
     "glsl/",
     "src/",
     "types/",
     "assets/*.ts",
-    "index.js",
     "index.ts",
     "README.md",
     "LICENSE"
   ],
   "types": "./types/index.d.ts",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/britalmeida/uirenderer-canvas.git"
+
+  "scripts": {
+    "build:types": "tsc",
+    "prepublishOnly": "yarn run build:types",
+    "lint": "eslint ."
   },
-  "author": "Inês Almeida",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/britalmeida/uirenderer-canvas/issues"
+
+  "devDependencies": {
+    "typescript": "5.1.6",
+    "@typescript-eslint/parser": "6.2.1",
+    "@typescript-eslint/eslint-plugin": "6.2.1",
+    "eslint": "8.46.0",
+    "vite": "4.4.8",
+    "vite-plugin-glsl": "1.1.2"
   },
-  "homepage": "https://github.com/britalmeida/uirenderer-canvas#readme"
+
+  "eslintConfig": {
+    "root": true,
+    "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": { "project": ["./tsconfig.json"] },
+    "plugins": ["@typescript-eslint"],
+    "rules": {
+      "semi": ["error", "always"]
+    },
+    "eslintIgnore": ["./types/*", "vite.config.ts"]
+  }
 }
