@@ -4,7 +4,8 @@ import type { vec2, vec4 } from './shading';
 function fitThumbsInGrid(thumbs: ThumbnailImage[],
                          originalImageSize: vec2,
                          uiConfig: { totalSpacing: vec2; minMargin: number },
-                         rect: { width: number, height: number }) {
+                         rect: { width: number, height: number })
+                         : vec2 {
 
   const numImages = thumbs.length;
 
