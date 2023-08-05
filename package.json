@@ -1,13 +1,14 @@
 {
   "name": "uirenderer-canvas",
-  "version": "1.0.7-beta.6",
+  "version": "1.0.7",
 
   "description": "Minimal 2D UI system for the Web",
+  "keywords": ["canvas", "webgl", "visualization", "ui"],
   "author": "Inês Almeida",
   "license": "MIT",
   "homepage": "https://github.com/britalmeida/uirenderer-canvas#readme",
   "repository": { "type": "git", "url": "git+https://github.com/britalmeida/uirenderer-canvas.git" },
-  "bugs": { "url": "https://github.com/britalmeida/uirenderer-canvas/issues" },
+  "bugs": "https://github.com/britalmeida/uirenderer-canvas/issues",
 
   "main": "index.ts",
   "files": [
@@ -41,10 +42,9 @@
     "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
     "parser": "@typescript-eslint/parser",
     "parserOptions": { "project": ["./tsconfig.json"] },
+    "ignorePatterns": ["types/*", "vite.config.ts"],
     "plugins": ["@typescript-eslint"],
     "rules": {
-      "semi": ["error", "always"]
-    },
-    "eslintIgnore": ["./types/*", "vite.config.ts"]
+    }
   }
 }
