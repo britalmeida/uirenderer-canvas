@@ -314,7 +314,10 @@ class UIRenderer {
     }
   }
 
-  addImage(left: number, top: number, width: number, height: number, textureID: WebGLTexture, cornerWidth = 0, alpha = 1.0): void {
+  addImage(
+    left: number, top: number, width: number, height: number,
+    textureID: WebGLTexture | undefined | null, cornerWidth = 0, alpha = 1.0): void {
+
     // Request the texture image as in use for this frame, if not in the bind list already.
     const textureRequestIdx = this.pushTextureID(textureID, this.textureIDs);
 
@@ -331,7 +334,10 @@ class UIRenderer {
     this.addImageInternal(left, top, width, height, samplerIdx, 0, cornerWidth, alpha);
   }
 
-  addImageFromBundle(left: number, top: number, width: number, height: number, textureID: WebGLTexture, slice: number, cornerWidth = 0, alpha = 1.0): void {
+  addImageFromBundle(
+    left: number, top: number, width: number, height: number,
+    textureID: WebGLTexture | undefined | null, slice: number, cornerWidth = 0, alpha = 1.0): void {
+
     // Request the texture image as in use for this frame, if not in the bind list already.
     const textureRequestIdx = this.pushTextureID(textureID, this.textureBundleIDs);
 
@@ -351,30 +357,37 @@ class UIRenderer {
   // Internal functions to write data to the command buffers.
 
   // Private. Add the given texture ID to the list of textures that will be used this frame, return its index.
-  pushTextureID(textureID: WebGLTexture, texturesToDraw: WebGLTexture[]): number {
+  pushTextureID(textureID: WebGLTexture | undefined | null, texturesToDraw: WebGLTexture[]): number {
+    // The requested texture is invalid (not created?).
+    if (!textureID) {
+      // Don't push a new used texture to the bind list, we should fall back to the error one instead.
+      return -2;
+    }
+
     const idx = texturesToDraw.indexOf(textureID);
-    if (idx === -1) {
+    if (idx !== -1) {
+      // This texture was already requested.
+      return idx;
+    }
+    else {
       // This texture was not requested yet.
-      if (textureID == null) {
-        // The requested texture is invalid (not created?).
-        // Don't push a new used texture to the bind list, we should fall back to the error one instead.
-        return -2;
-      } else if (this.loadingTextureIDs.indexOf(textureID) !== -1) {
+      
+      if (this.loadingTextureIDs.includes(textureID)) {
         // The requested texture is still loading.
-        // Don't push a new used texture to the bind list, we should fall back to the default one instead.
+        // Don't push a new used texture to the bind list, we should fall back to the default texture instead.
         return -1;
       } else {
         // Valid texture which hasn't been requested for this frame yet. Add it to the bind list.
         return texturesToDraw.push(textureID) - 1;
       }
-    } else {
-      // This texture was already requested.
-      return idx;
     }
   }
 
   // Private. Helper function to add an image command, either bundled or standalone.
-  addImageInternal(left: number, top: number, width: number, height: number, samplerIdx: number, slice: number, cornerWidth: number, alpha: number): void {
+  addImageInternal(
+    left: number, top: number, width: number, height: number,
+    samplerIdx: number, slice: number, cornerWidth: number, alpha: number): void {
+
     const bounds = new Rect(left, top, width, height);
     if (this.addPrimitiveShape(CMD.IMAGE, bounds, [1.0, 1.0, 1.0, alpha], 0, cornerWidth)) {
       let w = this.cmdDataIdx;
@@ -638,6 +651,7 @@ class UIRenderer {
   // Views
 
   getView(): View {
+    // The renderer should have pushed an initial default full-canvas view. The array should not be empty.
     return this.views[this.views.length - 1];
   }
 
@@ -651,8 +665,7 @@ class UIRenderer {
   popView(): void {
     this.views.pop();
     const v = this.getView();
-    if (v) { this.addClipRect(v.left, v.top, v.right, v.bottom); }
-    else { this.addClipRect(0, 0, this.viewport.width, this.viewport.height); }
+    this.addClipRect(v.left, v.top, v.right, v.bottom);
   }
 
   // Render Loop
