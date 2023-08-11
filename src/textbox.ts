@@ -66,19 +66,17 @@ class TextBox {
     this.rect = new Rect(left, top, width, height);
     this.text = text;
 
-
-    const tb = this;
     const fontSize = style.size;
     const textStyle = style;
 
     // Transform and clip the text box with the view.
 
     const v = this.renderer.getView();
-    let bounds = new Rect(tb.rect.left, tb.rect.top, tb.rect.width, tb.rect.height);
+    let bounds = new Rect(this.rect.left, this.rect.top, this.rect.width, this.rect.height);
     // Move (pan) and zoom the rectangle according to the view stack.
     bounds = v.transformRect(bounds);
     // Reduce the rectangle by a fixed size margin in px (zoom independent).
-    bounds.shrink(tb.margin);
+    bounds.shrink(this.margin);
     // Workaround: nudge the box a little to compensate.
     bounds.left -= 2; bounds.right -= 2;
     bounds.top += 2; bounds.bottom += 2;
@@ -168,7 +166,7 @@ class TextBox {
     }
 
     //this.renderer.addFrame(bounds.left, bounds.top, bounds.width, bounds.height, 0.5, [0.86, 0.86, 0.86, 1.0])
-    bounds = tb.rect;
+    bounds = this.rect;
     //this.renderer.addFrame(bounds.left, bounds.top, bounds.width, bounds.height, 0.5, [0.86, 0.86, 0.86, 1.0])
   }
 

@@ -181,7 +181,7 @@ class UIRenderer {
   private num_tiles_x = 1;
   private num_tiles_y = 1;
   private num_tiles_n = 1;
-  private cmdsPerTile = new Array(MAX_TILES); // Unpacked list of commands, indexed by tile. Used when adding shapes.
+  private cmdsPerTile = new Array<Uint16Array>(MAX_TILES); // Unpacked list of commands, indexed by tile. Used when adding shapes.
   private tileCmds = new Uint16Array(TILE_CMDS_BUFFER_LINE * TILE_CMDS_BUFFER_LINE); // Packed list of commands.
   private tileCmdRanges = new Uint16Array(MAX_TILES + 1); // Where each tile's data is in tileCmds. List of start indexes.
 
@@ -199,12 +199,12 @@ class UIRenderer {
 
   // Add Primitives.
 
-  addRect(left: number, top: number, width: number, height: number, color: vec4, cornerWidth: number = 0): void {
+  addRect(left: number, top: number, width: number, height: number, color: vec4, cornerWidth = 0): void {
     const bounds = new Rect(left, top, width, height);
     this.addPrimitiveShape(CMD.RECT, bounds, color, 0, cornerWidth);
   }
 
-  addFrame(left: number, top: number, width: number, height: number, lineWidth: number, color: vec4, cornerWidth: number = 0): void {
+  addFrame(left: number, top: number, width: number, height: number, lineWidth: number, color: vec4, cornerWidth = 0): void {
     const bounds = new Rect(left, top, width, height);
     this.addPrimitiveShape(CMD.FRAME, bounds, color, lineWidth, cornerWidth);
   }
@@ -314,7 +314,7 @@ class UIRenderer {
     }
   }
 
-  addImage(left: number, top: number, width: number, height: number, textureID: WebGLTexture, cornerWidth: number = 0, alpha: number = 1.0): void {
+  addImage(left: number, top: number, width: number, height: number, textureID: WebGLTexture, cornerWidth = 0, alpha = 1.0): void {
     // Request the texture image as in use for this frame, if not in the bind list already.
     const textureRequestIdx = this.pushTextureID(textureID, this.textureIDs);
 
@@ -331,7 +331,7 @@ class UIRenderer {
     this.addImageInternal(left, top, width, height, samplerIdx, 0, cornerWidth, alpha);
   }
 
-  addImageFromBundle(left: number, top: number, width: number, height: number, textureID: WebGLTexture, slice: number, cornerWidth: number = 0, alpha: number = 1.0): void {
+  addImageFromBundle(left: number, top: number, width: number, height: number, textureID: WebGLTexture, slice: number, cornerWidth = 0, alpha = 1.0): void {
     // Request the texture image as in use for this frame, if not in the bind list already.
     const textureRequestIdx = this.pushTextureID(textureID, this.textureBundleIDs);
 
@@ -445,8 +445,8 @@ class UIRenderer {
         || (corner !== null && this.stateCorner !== corner)
     ) {
       this.stateColor = color;
-      this.stateLineWidth = lineWidth !== null ? lineWidth : 1.0;
-      this.stateCorner = corner !== null ? corner : 0.0;
+      this.stateLineWidth = lineWidth ?? 1.0;
+      this.stateCorner = corner ?? 0.0;
       //this.stateChanges++;
 
       let sw = this.styleDataIdx;

@@ -112,7 +112,7 @@ function fitThumbsInGroup(summaryText: { str: string, pos: vec2 },
     thumbsPerGroup.push(group.thumbIdxs.length);
   }
   thumbsPerGroup.sort((a, b) => b - a);
-  const maxNumThumbsFoundInGroup: number = thumbsPerGroup[0]!;
+  const maxNumThumbsFoundInGroup: number = thumbsPerGroup[0];
   //console.log(thumbsPerGroup);
 
   // Get size of the region containing the thumbnails.
@@ -306,7 +306,7 @@ class ThumbnailImage {
   objIdx: number; // Index in the array of objects.
   // Grouped view
   group: ThumbnailGroup | null = null; // Group that this thumbnail belongs to.
-  posInGroup: number = -1; // Relative position in the thumbnails of this group.
+  posInGroup = -1; // Relative position in the thumbnails of this group.
 
   constructor(obj: object | null, objIdx: number) {
     this.obj = obj;
@@ -329,7 +329,7 @@ class ThumbnailGroup {
   // Object that this group represents, e.g. a Sequence, a Task Status, or an Assignee.
   criteriaObj: object | null;
 
-  constructor(displayStr: string = "", displayColor: vec4 = [0.8, 0.0, 0.0, 1.0], criteriaObj: object | null = null) {
+  constructor(displayStr = "", displayColor: vec4 = [0.8, 0.0, 0.0, 1.0], criteriaObj: object | null = null) {
     this.name = displayStr;
     this.color = displayColor;
     this.criteriaObj = criteriaObj;
