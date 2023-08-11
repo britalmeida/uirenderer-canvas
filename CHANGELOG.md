@@ -8,9 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Wip wip...
 
+## [1.1.1] - 2023-08-11
+
+### Fixed
+- Regression where `addImage` was no longer accepting null or undefined textures.
+
+
 ## [1.1.0] - 2023-08-05
 
-## Shiny and New
+### Shiny and New
 - **New shapes** available: diamonds, arbitrary quads.
   `addDiamond`  `addQuad`
 - Exposed `vec2` and `vec4` as types.
@@ -25,7 +31,7 @@ speed for internal use which can also affect clients:
   - Vue 2->3 examples,
   - renamed directories.
 
-## Experimental
+### Experimental
 - **Font** and Text Box support.  
   Bare minimum implementation with monospaced font and hardcoded font family, weight, color and
   shadow. `addText` renders a string of text with zoom independent size, while `addGlyph` is zoom
@@ -35,7 +41,7 @@ speed for internal use which can also affect clients:
   This is now fixed, but if you've linked uirenderer-canvas *after* v1.0.6 up to v1.0.7-beta.3 and
   worked around the error, the workaround is no longer necessary and can be undone.
 
-## Fixed
+### Fixed
 - Rendering more than one unique single image.
 
 
