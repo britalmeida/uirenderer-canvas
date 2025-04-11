@@ -4,12 +4,18 @@
 
   "description": "Minimal 2D UI system for the Web",
   "keywords": ["canvas", "webgl", "visualization", "ui"],
+
   "author": "Inês Almeida",
   "license": "MIT",
+
   "homepage": "https://github.com/britalmeida/uirenderer-canvas#readme",
-  "repository": { "type": "git", "url": "git+https://github.com/britalmeida/uirenderer-canvas.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/britalmeida/uirenderer-canvas.git"
+  },
   "bugs": "https://github.com/britalmeida/uirenderer-canvas/issues",
 
+  "type": "module",
   "main": "index.ts",
   "files": [
     "glsl/",
@@ -33,7 +39,7 @@
     "@typescript-eslint/parser": "6.2.1",
     "@typescript-eslint/eslint-plugin": "6.2.1",
     "eslint": "8.46.0",
-    "vite": "4.4.8",
+    "vite": "4.4.9",
     "vite-plugin-glsl": "1.1.2"
   },
 
