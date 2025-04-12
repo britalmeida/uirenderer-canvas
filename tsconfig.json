@@ -1,18 +1,22 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2022", // Vite ignores this during development and uses ESNext.
 
     /* Modules */
     "isolatedModules": true, // For compatibility with Vite's HMR.
-
-    /* Emit */
-    "declarationDir": "./types",
-    "declaration": true,
-    "declarationMap": true,
-    "emitDeclarationOnly": true,
+    "skipLibCheck": true, // Avoid type-checking declaration files.
+    // Only include these listed types in the global scope instead of everything in node_modules from enclosing folders.
     "types": [
       "vite-plugin-glsl/ext"
     ],
+
+    /* Emit */
+    "declarationDir": "./types", // Where to place the emitted types.
+    "declaration": true, // Create .d.ts files with the type information.
+    "declarationMap": true, // Create .d.ts.map files to help IDEs link to the original .ts file.
+    // TODO: this package should emit JS and types, with the shaders inlined.
+    "emitDeclarationOnly": true, // Create only .d.ts files, not .js files.
+    // "removeComments": true, // Make the resulting .js smaller.
 
     /* Type Checking */
     "strict": true,
@@ -25,8 +29,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
+
+  /* Sources to compile */
   "include": [
-    "glsl/*",
+    "assets/*",
     "src/*",
     "index.ts"
   ]
